@@ -1,0 +1,18 @@
+# Emon DSL 工具 manifest 模板（文档 5.5）
+# 由 compiler 自动生成，用户也可手动定制
+tool:
+  name: <TOOL_NAME>
+  version: "0.1"
+  description: >
+    Emon DSL 生成的 eBPF 工具（system-wide observability）
+  options:
+    target_pid: 0
+    min_latency: 10000
+    interval_ms: 1000
+maps: []
+probes: []
+events: []
+outputs:
+  - kind: stdout
+    format: table
+    refresh: 1000ms
