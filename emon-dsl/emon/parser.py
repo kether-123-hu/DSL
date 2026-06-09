@@ -194,11 +194,19 @@ class EmonTransformer(Transformer):
         return WhenClause(cond=items[1])
 
     def measure_clause(self, items):
-        metrics = [item for item in items[1:] if isinstance(item, Metric)]
+        metrics = []
+        for item in items[1:]:
+            if isinstance(item, Metric):
+                metrics.append(item)
         return MeasureClause(metrics=metrics)
 
     def measure_item(self, items):
-        return _METRIC_MAP[items[0].value]
+        for item in items:
+            if isinstance(item, Token):
+                return _METRIC_MAP[item.value]
+            elif isinstance(item, str):
+                return _METRIC_MAP[item]
+        return _METRIC_MAP[str(items[0])]
 
     def block(self, items):
         return list(items[1:-1])

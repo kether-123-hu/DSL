@@ -12,7 +12,7 @@ tool syscall_latency_monitor {
 
 observe syscall("read", "write", "openat")
 where target_pid == 0 || pid == target_pid
-measure latency
+measure latency, retval
 when latency > min_latency
 {
     @count[comm, pid, syscall]         = count();

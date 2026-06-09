@@ -43,6 +43,9 @@ STRING: /"(?:[^"\\]|\\.)*"/
 // Examples: @count, @avg_latency
 AGG_IDENT: /@[a-zA-Z_][a-zA-Z0-9_]*/
 
+// Measure keywords
+MEASURE_KW: "latency" | "count" | "size" | "retval" | "stack"
+
 // Regular identifier: letter or underscore start, may contain digits.
 IDENT: /[a-zA-Z_][a-zA-Z0-9_]*/
 
@@ -132,8 +135,7 @@ where_clause: "where" expr
 measure_clause: "measure" measure_item ("," measure_item)*
 
 // MeasureItem ::= "latency" | "count" | "size" | "retval" | "stack"
-measure_item: MEASURE_KW
-MEASURE_KW: "latency" | "count" | "size" | "retval" | "stack"
+measure_item: "latency" | "count" | "size" | "retval" | "stack"
 
 // WhenClause ::= "when" Expr
 // Post-measurement filter: evaluated on measurement results.
