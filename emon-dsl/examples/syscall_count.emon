@@ -2,10 +2,11 @@
 // 演示只使用 where 与 @count 聚合（文档 5.4.5）
 
 tool syscall_counter {
-    option top = 20;
+    option top_n = 20;
+}
 
-    observe syscall("read", "write", "openat", "close", "mmap") {
-        where pid > 0;
-        @count = count(pid, comm, syscall);
-    }
+observe syscall("read", "write", "openat", "close", "mmap")
+where pid > 0
+{
+    @count[pid, comm, syscall] = count();
 }

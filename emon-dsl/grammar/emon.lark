@@ -1,0 +1,321 @@
+// ============================================================
+// Emon DSL Grammar Definition (Lark)
+// A domain-specific language for eBPF monitoring and tooling.
+//
+// Covers sections 4.1.1 through 4.1.4 of the project plan:
+//
+//   Lexical tokens (4.1.1):
+//     Ident, IntLit, StringLit, BoolLit, TimeLit, SizeLit, AggIdent
+//
+//   Syntax (4.1.2):
+//     Program, ToolDecl, OptionDecl
+//     ObserveStmt (7 observation targets)
+//     WhereClause, MeasureClause, WhenClause
+//     ActionStmt (aggregation / emit / print / let / if)
+//     EveryStmt, BeginStmt, EndStmt
+//
+//   Expressions (4.1.3):
+//     Logical, comparison, arithmetic, unary, function calls,
+//     aggregation references, built-in context variables.
+// ============================================================
+
+
+// ---------------------------------------------------------------------------
+// Part 1: Lexical Terminals
+// ---------------------------------------------------------------------------
+
+// Time literal: integer + time unit (whitespace allowed between number and unit).
+// Examples: 100us, 1ms, 500ns, 2s
+TIME_LIT.2: /\d+\s*(ns|us|ms|s)/
+
+// Size literal: integer + size unit.
+// Examples: 256KB, 1MB, 4096B
+SIZE_LIT.2: /\d+\s*(B|KB|MB)/
+
+// Numeric and boolean literals.
+INT.1: /[0-9]+/
+BOOL.2: "true" | "false"
+
+// Double-quoted string with escape support.
+STRING: /"(?:[^"\\]|\\.)*"/
+
+// Aggregation variable identifier: starts with '@'.
+// Examples: @count, @avg_latency
+AGG_IDENT: /@[a-zA-Z_][a-zA-Z0-9_]*/
+
+// Regular identifier: letter or underscore start, may contain digits.
+IDENT: /[a-zA-Z_][a-zA-Z0-9_]*/
+
+// Whitespace and comments.
+%ignore /[ \t\f\r\n]+/
+%ignore /\/\/[^\n]*/
+%ignore /\/\*(?:[^*]|\*+[^\/])*\*+\//
+
+
+// ---------------------------------------------------------------------------
+// Part 2: Top-level Program Structure
+// ---------------------------------------------------------------------------
+
+start: program
+
+// Program ::= ToolDecl { TopStmt }
+program: tool_decl top_stmt*
+
+// ToolDecl ::= "tool" Ident "{" { OptionDecl } "}"
+tool_decl: "tool" IDENT "{" option_decl* "}"
+
+// OptionDecl ::= "option" Ident "=" ConstExpr ";"
+// ConstExpr values must be compile-time evaluable constants.
+option_decl: "option" IDENT "=" const_expr ";"
+
+// ConstExpr ::= IntLit | StringLit | BoolLit | TimeLit | SizeLit
+?const_expr: INT          -> const_int
+           | STRING       -> const_string
+           | BOOL         -> const_bool
+           | time_lit     -> const_time
+           | size_lit     -> const_size
+
+time_lit: TIME_LIT
+size_lit: SIZE_LIT
+
+// TopStmt ::= ObserveStmt | EveryStmt | BeginStmt | EndStmt
+top_stmt: observe_stmt
+        | every_stmt
+        | begin_stmt
+        | end_stmt
+
+
+// ---------------------------------------------------------------------------
+// Part 3: Observe Statement
+// ---------------------------------------------------------------------------
+
+// ObserveStmt ::= "observe" ObserveTarget
+//                 [ WhereClause ] [ MeasureClause ] [ WhenClause ]
+//                 Block
+observe_stmt: "observe" observe_target [where_clause] [measure_clause] [when_clause] block
+
+// ObserveTarget: 7 observation target types.
+// ObserveTarget ::= "syscall"    "(" StringList ")"
+//                | "kernel"     "(" StringList ")"
+//                | "tracepoint" "(" StringList ")"
+//                | "uprobe"     "(" StringLit "," StringList ")"
+//                | "sched"      "(" StringList ")"
+//                | "file"       "(" StringList ")"
+//                | "net"        "(" StringList ")"
+observe_target: syscall_target
+              | kernel_target
+              | tracepoint_target
+              | uprobe_target
+              | sched_target
+              | file_target
+              | net_target
+
+syscall_target:    "syscall"    "(" string_list ")"
+kernel_target:     "kernel"     "(" string_list ")"
+tracepoint_target: "tracepoint" "(" string_list ")"
+sched_target:      "sched"      "(" string_list ")"
+file_target:       "file"       "(" string_list ")"
+net_target:        "net"        "(" string_list ")"
+
+// uprobe: binary path + function name list.
+// Example: observe uprobe("/bin/bash", "readline", "malloc")
+uprobe_target: "uprobe" "(" STRING "," string_list ")"
+
+// StringList ::= StringLit { "," StringLit }
+string_list: STRING ("," STRING)*
+
+// WhereClause ::= "where" Expr
+// Pre-measurement filter: evaluated on raw events before measurement.
+where_clause: "where" expr
+
+// MeasureClause ::= "measure" MeasureItem { "," MeasureItem }
+measure_clause: "measure" measure_item ("," measure_item)*
+
+// MeasureItem ::= "latency" | "count" | "size" | "retval" | "stack"
+measure_item: MEASURE_KW
+MEASURE_KW: "latency" | "count" | "size" | "retval" | "stack"
+
+// WhenClause ::= "when" Expr
+// Post-measurement filter: evaluated on measurement results.
+when_clause: "when" expr
+
+
+// ---------------------------------------------------------------------------
+// Part 4: Code Blocks and Action Statements
+// ---------------------------------------------------------------------------
+
+// Block ::= "{" { ActionStmt } "}"
+block: "{" action_stmt* "}"
+
+// ActionStmt ::= AggregationStmt | EmitStmt | PrintStmt | LetStmt | IfStmt
+action_stmt: aggregation_stmt
+           | emit_stmt
+           | print_stmt
+           | let_stmt
+           | if_stmt
+
+// -- 4.1 Aggregation Statement ----------------------------------------------
+// AggregationStmt ::= AggIdent "[" KeyList "]" "=" AggFunc "(" [ Expr ] ")" ";"
+//
+// Examples:
+//   @count[comm, pid, syscall]        = count();
+//   @avg_latency[comm, pid, syscall]  = avg(latency);
+//   @latency_hist[comm, pid, syscall] = hist(latency);
+//   @total_bytes[comm]                = sum(size);
+//   @max_lat[comm]                    = max(latency);
+aggregation_stmt: AGG_IDENT "[" key_list "]" "=" agg_func "(" [expr] ")" ";"
+
+// KeyList ::= Expr { "," Expr }
+key_list: expr ("," expr)*
+
+// AggFunc ::= "count" | "sum" | "avg" | "min" | "max" | "hist" | "lhist"
+agg_func: AGG_FUNC_KW
+AGG_FUNC_KW: "count" | "sum" | "avg" | "min" | "max" | "hist" | "lhist"
+
+// -- 4.2 Emit Statement -----------------------------------------------------
+// EmitStmt ::= "emit" "{" { FieldAssign ";" } "}" ";"
+//
+// Example:
+//   emit {
+//       time    = nsecs;
+//       pid     = pid;
+//       latency = latency;
+//   };
+emit_stmt: "emit" "{" (field_assign ";")+ "}" ";"
+
+// FieldAssign ::= Ident "=" Expr
+field_assign: IDENT "=" expr
+
+// -- 4.3 Print Statement ----------------------------------------------------
+// PrintStmt ::= "print" "(" Expr ")" ";"
+//
+// Examples:
+//   print("==== summary ====");
+//   print(top(@count, 10));
+//   print(@avg_latency);
+print_stmt: "print" "(" expr ")" ";"
+
+// -- 4.4 Let Statement ------------------------------------------------------
+// LetStmt ::= "let" Ident "=" Expr ";"
+//
+// Examples:
+//   let threshold = 1000;
+//   let proc_name = comm;
+let_stmt: "let" IDENT "=" expr ";"
+
+// -- 4.5 If Statement -------------------------------------------------------
+// IfStmt ::= "if" "(" Expr ")" Block [ "else" Block ]
+//
+// Example:
+//   if (latency > 1000000) {
+//       @slow[comm] = count();
+//   } else {
+//       @fast[comm] = count();
+//   }
+if_stmt: "if" "(" expr ")" block ["else" block]
+
+
+// ---------------------------------------------------------------------------
+// Part 5: Lifecycle Statements (every / begin / end)
+// ---------------------------------------------------------------------------
+
+// EveryStmt ::= "every" Expr Block
+// Periodic userspace task. Expr is the interval (TimeLit or option reference).
+// Examples:
+//   every 1s      { print(@count); }
+//   every interval { print(@avg_latency); }
+every_stmt: "every" expr block
+
+// BeginStmt ::= "begin" Block
+// Executed once at tool startup (userspace initialization).
+// Example:
+//   begin {
+//       print("Monitoring started.");
+//   }
+begin_stmt: "begin" block
+
+// EndStmt ::= "end" Block
+// Executed once at tool shutdown (userspace cleanup).
+// Example:
+//   end {
+//       print("Final report:");
+//       print(@count);
+//   }
+end_stmt: "end" block
+
+
+// ---------------------------------------------------------------------------
+// Part 6: Expression System (in order of increasing precedence)
+// ---------------------------------------------------------------------------
+// In Lark, rules defined earlier have lower precedence (expand first).
+//
+// Precedence chain:
+//   expr       ->  logical OR  (||)          [lowest]
+//   or_expr    ->  logical AND (&&)
+//   and_expr   ->  equality    (== !=)
+//   eq_expr    ->  relational  (< <= > >=)
+//   rel_expr   ->  additive    (+ -)
+//   add_expr   ->  multiplicative (* / %)
+//   mul_expr   ->  unary       (! -)
+//   unary_expr ->  primary                  [highest]
+
+?expr: or_expr
+
+?or_expr: and_expr ("||" and_expr)*
+
+?and_expr: eq_expr ("&&" eq_expr)*
+
+?eq_expr: rel_expr (("==" | "!=") rel_expr)*
+
+?rel_expr: add_expr (("<" | "<=" | ">" | ">=") add_expr)*
+
+?add_expr: mul_expr (("+" | "-") mul_expr)*
+
+?mul_expr: unary_expr (("*" | "/" | "%") unary_expr)*
+
+?unary_expr: ("!" | "-") unary_expr -> unary_op
+           | primary
+
+// -- Primary Expressions ----------------------------------------------------
+// Primary ::= AggIdent | FuncCall | IntLit | StringLit
+//           | BoolLit | TimeLit | SizeLit | Ident | "(" Expr ")"
+?primary: AGG_IDENT            -> agg_ref
+        | func_call
+        | INT                  -> int_lit
+        | STRING               -> string_lit
+        | BOOL                 -> bool_lit
+        | TIME_LIT             -> time_lit
+        | SIZE_LIT             -> size_lit
+        | IDENT                -> var_ref
+        | "(" expr ")"
+
+// -- Function Calls ---------------------------------------------------------
+// FuncCall ::= Ident "(" [ ArgList ] ")"
+//
+// Examples:
+//   top(@count, 10)   -- built-in top-N query function
+//   count()            -- aggregation function (in non-assignment context)
+func_call: IDENT "(" [arg_list] ")"
+
+// ArgList ::= Expr { "," Expr }
+arg_list: expr ("," expr)*
+
+
+// ---------------------------------------------------------------------------
+// Appendix: Built-in Context Variables (referenced via IDENT)
+// ---------------------------------------------------------------------------
+// These are resolved during semantic analysis, not at the grammar level.
+//
+//   pid       - Current process ID
+//   tid       - Current thread ID
+//   uid       - Current user ID
+//   gid       - Current group ID
+//   comm      - Current process name (char[16])
+//   cpu       - Current CPU number
+//   nsecs     - Current timestamp in nanoseconds
+//   syscall   - Current syscall name (only in observe syscall scope)
+//   func      - Current function name (only in observe kernel/uprobe scope)
+//   retval    - Return value (only in return-semantic scope)
+//   latency   - Measured latency (only in measure latency scope)
+//   size      - Measured size (only in measure size scope)
+//   stack     - Call stack information (only in measure stack scope)

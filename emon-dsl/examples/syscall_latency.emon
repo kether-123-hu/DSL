@@ -1,41 +1,40 @@
-// Emon DSL 示例（文档 5.1-5.4）
-// 目标：监控 read/write/openat 三类系统调用的延迟
-//        按进程 id / 调用名聚合，延迟超过阈值时发出事件
-//        每秒打印调用次数、平均延迟、直方图
+// ============================================================
+// Emon DSL Example: Syscall Latency Monitor
+// Corresponds to section 5.1 of the project plan.
+// ============================================================
 
 tool syscall_latency_monitor {
-    option target_pid   = 0;      // 0 = 所有进程
-    option min_latency  = 10000;  // ns
-    option interval     = 1000;   // ms（every 周期）
+    option target_pid   = 0;
+    option min_latency  = 100us;
+    option interval     = 1s;
     option top          = 10;
+}
 
-    observe syscall("read", "write", "openat") {
-        // 进入前过滤
-        where target_pid == 0 || pid == target_pid;
+observe syscall("read", "write", "openat")
+where target_pid == 0 || pid == target_pid
+measure latency
+when latency > min_latency
+{
+    @count[comm, pid, syscall]         = count();
+    @avg_latency[comm, pid, syscall]   = avg(latency);
+    @latency_hist[comm, pid, syscall]  = hist(latency);
 
-        // 测量系统调用延迟
-        measure latency;
+    emit {
+        time    = nsecs;
+        comm    = comm;
+        pid     = pid;
+        tid     = tid;
+        uid     = uid;
+        cpu     = cpu;
+        syscall = syscall;
+        latency = latency;
+        retval  = retval;
+    };
+}
 
-        // 测量后过滤
-        when latency > min_latency;
-
-        // 聚合变量（编译器推导）
-        @count       = count(pid, syscall);
-        @avg_latency = avg(latency);
-        @latency_hist = hist(latency);
-
-        // 事件输出（5.4.6）
-        emit {
-            syscall_name: syscall,
-            pid: pid,
-            comm: comm,
-            latency_ns: latency,
-            retval: retval,
-        }
-
-        every interval {
-            // 编译器生成用户态 libbpf 轮询代码，读取 @count/@avg/@hist
-            print top @count;
-        }
-    }
+every interval {
+    print("==== syscall latency summary ====");
+    print(top(@count, top));
+    print(@avg_latency);
+    print(@latency_hist);
 }

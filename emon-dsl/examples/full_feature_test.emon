@@ -1,0 +1,181 @@
+// ============================================================
+// Emon DSL Full Feature Syntax Test
+// Covers all lexical and syntax units from sections 4.1.1-4.1.3.
+// ============================================================
+
+tool full_feature_test {
+    option target_pid   = 0;
+    option threshold    = 1ms;
+    option interval     = 2s;
+    option top_n        = 10;
+    option max_size     = 1MB;
+    option debug        = true;
+    option log_path     = "/var/log/emon.log";
+}
+
+// Test 1: syscall monitoring + let/if statements
+observe syscall("read", "write", "openat", "close")
+where target_pid == 0 || pid == target_pid
+measure latency, retval
+when latency > threshold && retval >= 0 && debug == true
+{
+    // Aggregation: count / avg / hist / sum / min / max / lhist
+    @count[comm, pid, syscall]        = count();
+    @avg_lat[comm, pid, syscall]      = avg(latency);
+    @hist_lat[comm, pid, syscall]     = hist(latency);
+    @sum_lat[comm]                    = sum(latency);
+    @min_lat[comm]                    = min(latency);
+    @max_lat[comm]                    = max(latency);
+    @lhist_lat[comm]                  = lhist(latency);
+
+    // let: local variable declaration
+    let slow = 1000000;
+    let is_slow = latency > slow;
+
+    // if/else: conditional branching
+    if (is_slow) {
+        @slow_count[comm, syscall] = count();
+    } else {
+        @fast_count[comm, syscall] = count();
+    }
+
+    // Unary operators: logical NOT, unary minus
+    if (!is_slow && -retval == -1) {
+        @error_count[comm] = count();
+    }
+
+    // emit: per-event output
+    emit {
+        time    = nsecs;
+        comm    = comm;
+        pid     = pid;
+        tid     = tid;
+        uid     = uid;
+        cpu     = cpu;
+        syscall = syscall;
+        latency = latency;
+        retval  = retval;
+    };
+}
+
+// Test 2: kernel function monitoring (kprobe)
+observe kernel("tcp_v4_connect", "tcp_v6_connect")
+measure latency
+{
+    @k_count[func]          = count();
+    @k_avg[func]            = avg(latency);
+    @k_hist[func]           = hist(latency);
+
+    emit {
+        time    = nsecs;
+        func    = func;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+// Test 3: tracepoint monitoring
+observe tracepoint("sched:sched_process_exec", "sched:sched_process_exit")
+measure count
+{
+    @exec_count[comm, pid]  = count();
+
+    emit {
+        time = nsecs;
+        comm = comm;
+        pid  = pid;
+    };
+}
+
+// Test 4: uprobe userspace function monitoring
+observe uprobe("/bin/bash", "readline")
+measure latency, retval
+{
+    @bash_count[pid, comm]    = count();
+    @bash_avg[pid, comm]      = avg(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+// Test 5: scheduler events
+observe sched("sched_switch")
+measure count
+{
+    @switch_count[cpu] = count();
+
+    emit {
+        time = nsecs;
+        cpu  = cpu;
+        comm = comm;
+    };
+}
+
+// Test 6: file system events
+observe file("open", "close", "read", "write")
+measure latency, size
+when size > max_size
+{
+    @file_count[comm, pid]  = count();
+    @file_size[comm, pid]   = sum(size);
+    @file_avg[comm, pid]    = avg(latency);
+
+    emit {
+        time    = nsecs;
+        comm    = comm;
+        pid     = pid;
+        size    = size;
+        latency = latency;
+    };
+}
+
+// Test 7: network events
+observe net("tcp", "udp")
+measure count, size
+{
+    @net_count[comm]    = count();
+    @net_size[comm]     = sum(size);
+
+    emit {
+        time = nsecs;
+        comm = comm;
+        pid  = pid;
+        size = size;
+    };
+}
+
+// Test 8: begin / end lifecycle blocks
+begin {
+    print("=== Emon DSL Full Feature Test ===");
+    print("Monitoring started.");
+}
+
+end {
+    print("=== Final Report ===");
+    print(top(@count, top_n));
+    print(top(@slow_count, top_n));
+    print(@avg_lat);
+    print(@hist_lat);
+    print(@lhist_lat);
+    print(@file_size);
+    print(@net_count);
+}
+
+// Test 9: every periodic task + print variants
+every interval {
+    print("--- Periodic Report ---");
+    print(top(@count, top_n));
+    print(top(@k_count, 5));
+    print(@avg_lat);
+    print(@hist_lat);
+    print(@min_lat);
+    print(@max_lat);
+    print(@bash_avg);
+    print(@file_size);
+    print(@net_size);
+}

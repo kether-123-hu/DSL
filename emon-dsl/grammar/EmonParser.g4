@@ -1,144 +1,200 @@
 // =====================================================================
-// Emon DSL 语法分析器（EmonParser.g4）
-// 对应文档章节 4.1.2 —— 句法定义
-// 顶层结构：
-//   program := toolDecl optionDecl* observeRule* everyRule*
-//   observeRule := observe hook '{' where? measure? when? statement* '}'
+// Emon DSL Parser Grammar (ANTLR4)
+// Aligned with project plan section 4.1.2 and language spec v0.01.
+//
+// Top-level structure:
+//   program := toolDecl { topStmt }
+//   topStmt := observeStmt | everyStmt | beginStmt | endStmt
 // =====================================================================
 parser grammar EmonParser;
 
 options { tokenVocab = EmonLexer; }
 
-// ---- 顶层程序 ----
+// ---- Top-level Program ----
 program
-    : toolDecl optionDecl* statement* EOF
+    : toolDecl topStmt* EOF
     ;
 
-// ---- 工具声明（文档 4.1.2 ToolDecl）----
+// ---- Tool Declaration ----
 toolDecl
-    : TOOL IDENT LBRACE optionDecl* ruleDecl* RBRACE
+    : TOOL IDENT LBRACE optionDecl* RBRACE
     ;
 
 optionDecl
-    : OPTION IDENT ASSIGN expr SEMI
+    : OPTION varIdent ASSIGN constExpr SEMI
     ;
 
-// ---- 监控规则（文档 4.1.2 核心文法）----
-ruleDecl
-    : OBSERVE hook LBRACE ruleBody RBRACE
+constExpr
+    : INTEGER
+    | STRING
+    | TRUE
+    | FALSE
+    | TIME_LIT
+    | SIZE_LIT
     ;
 
-hook
-    : SYSCALL    LPAREN stringList RPAREN            # hookSyscall
-    | TRACEPOINT LPAREN STRING COMMA STRING RPAREN   # hookTracepoint
-    | KPROBE     LPAREN STRING RPAREN                # hookKprobe
-    | KRETPROBE  LPAREN STRING RPAREN                # hookKretprobe
-    | UPROBE     LPAREN STRING (COLON STRING)? RPAREN# hookUprobe
-    | FENTRY     LPAREN STRING RPAREN                # hookFentry
-    | FEXIT      LPAREN STRING RPAREN                # hookFexit
-    | NET        LPAREN STRING? RPAREN               # hookNet
-    | FILE       LPAREN STRING? RPAREN               # hookFile
-    | PROC       LPAREN STRING? RPAREN               # hookProc
+// ---- Top-level Statements ----
+topStmt
+    : observeStmt
+    | everyStmt
+    | beginStmt
+    | endStmt
+    ;
+
+// ---- Observe Statement ----
+observeStmt
+    : OBSERVE observeTarget whereClause? measureClause? whenClause? block
+    ;
+
+// ObserveTarget: 7 observation target types.
+observeTarget
+    : SYSCALL     LPAREN stringList RPAREN     # targetSyscall
+    | KERNEL      LPAREN stringList RPAREN     # targetKernel
+    | TRACEPOINT  LPAREN stringList RPAREN     # targetTracepoint
+    | UPROBE      LPAREN STRING COMMA stringList RPAREN  # targetUprobe
+    | SCHED       LPAREN stringList RPAREN     # targetSched
+    | FILE_KW     LPAREN stringList RPAREN     # targetFile
+    | NET         LPAREN stringList RPAREN     # targetNet
     ;
 
 stringList
     : STRING (COMMA STRING)*
     ;
 
-ruleBody
-    : clause*
+whereClause
+    : WHERE expr
     ;
 
-clause
-    : WHERE  expr SEMI?      # clauseWhere
-    | MEASURE metric SEMI?   # clauseMeasure
-    | WHEN   expr SEMI?      # clauseWhen
-    | aggregation            # clauseAgg
-    | emitStmt               # clauseEmit
-    | letStmt                # clauseLet
-    | ifStmt                 # clauseIf
+measureClause
+    : MEASURE measureItem (COMMA measureItem)*
     ;
 
-metric
-    : LATENCY                # metricLatency
-    | COUNT                  # metricCount
-    | SIZE                   # metricSize
+measureItem
+    : LATENCY
+    | COUNT
+    | SIZE_KW
+    | RETVAL_KW
+    | STACK_KW
     ;
 
-// ---- 聚合语句（文档 4.1.2 / 5.6：@count、@avg、@hist 等）----
-aggregation
-    : AGG_IDENT ASSIGN aggFunc LPAREN keyExpr? RPAREN SEMI
+whenClause
+    : WHEN expr
     ;
 
-aggFunc
-    : COUNT | SUM | AVG | HIST | MIN | MAX
+// ---- Code Block and Action Statements ----
+block
+    : LBRACE actionStmt* RBRACE
     ;
 
-keyExpr
+actionStmt
+    : aggregationStmt
+    | emitStmt
+    | printStmt
+    | letStmt
+    | ifStmt
+    ;
+
+// -- Aggregation Statement --
+aggregationStmt
+    : AGG_IDENT LBRACKET keyList RBRACKET ASSIGN aggFunc LPAREN expr? RPAREN SEMI
+    ;
+
+keyList
     : expr (COMMA expr)*
     ;
 
-// ---- 事件输出（emit { ... }）----
+aggFunc
+    : COUNT | SUM | AVG | HIST | LHIST | MIN | MAX
+    ;
+
+// -- Emit Statement --
 emitStmt
-    : EMIT LBRACE emitField (COMMA emitField)* RBRACE SEMI
+    : EMIT LBRACE (fieldAssign SEMI)+ RBRACE SEMI
     ;
 
-emitField
-    : IDENT COLON expr
+fieldAssign
+    : varIdent ASSIGN expr
     ;
 
-// ---- 周期性任务（every interval { ... }）----
-statement
-    : ruleDecl
-    | optionDecl
-    | everyStmt
-    | letStmt
-    | ifStmt
-    | aggregation
-    | emitStmt
-    | expr SEMI
+// -- Print Statement --
+printStmt
+    : PRINT LPAREN expr RPAREN SEMI
     ;
 
-everyStmt
-    : EVERY expr LBRACE statement* RBRACE
-    ;
-
+// -- Let Statement --
 letStmt
-    : LET IDENT ASSIGN expr SEMI
+    : LET varIdent ASSIGN expr SEMI
     ;
 
+// -- If Statement --
 ifStmt
-    : IF expr THEN LBRACE statement* RBRACE (ELSE LBRACE statement* RBRACE)?
+    : IF LPAREN expr RPAREN block (ELSE block)?
     ;
 
-// ---- 表达式（受限布尔/算术语法）----
+// ---- Lifecycle Statements ----
+everyStmt
+    : EVERY expr block
+    ;
+
+beginStmt
+    : BEGIN block
+    ;
+
+endStmt
+    : END block
+    ;
+
+// ---- Expression System (in order of increasing precedence) ----
 expr
     : LPAREN expr RPAREN                           # exprParen
-    | unary=(NOT|MINUS) expr                       # exprUnary
+    | <assoc=right> unary=(NOT|MINUS) expr         # exprUnary
     | expr op=(STAR|SLASH|PERCENT) expr            # exprMul
     | expr op=(PLUS|MINUS) expr                    # exprAdd
-    | expr op=(LSHIFT|RSHIFT) expr                 # exprShift
     | expr op=(LT|GT|LE|GE) expr                   # exprCmp
     | expr op=(EQ|NEQ) expr                        # exprEq
-    | expr op=BITAND expr                          # exprBitAnd
-    | expr op=BITXOR expr                          # exprBitXor
-    | expr op=BITOR  expr                          # exprBitOr
     | expr op=AND expr                             # exprAnd
     | expr op=OR  expr                             # exprOr
     | primary                                      # exprPrimary
     ;
 
+// ---- Primary Expressions ----
 primary
-    : INTEGER                   # litInt
-    | FLOAT                     # litFloat
+    : funcCall                  # litFuncCall
+    | INTEGER                   # litInt
     | STRING                    # litStr
     | TRUE                      # litTrue
     | FALSE                     # litFalse
     | TIME_LIT                  # litTime
     | SIZE_LIT                  # litSize
     | AGG_IDENT                 # litAgg
+    | contextVar                # litCtx
     | IDENT                     # litIdent
-    | PID | TID | UID | GID | CPU | COMM | RETVAL
-    | SYSCALL_NAME              # ctxIdent
+    ;
+
+// ---- Context Variables ----
+contextVar
+    : PID | TID | UID | GID | CPU | COMM | NSECS
+    | SYSCALL | FUNC | LATENCY | RETVAL_KW | SIZE_KW | STACK_KW
     | ARG0 | ARG1 | ARG2 | ARG3 | ARG4 | ARG5
+    ;
+
+// ---- Variable-like Identifier (IDENT or context var token) ----
+// ANTLR4 lexer defines context vars as separate tokens, so they
+// cannot be matched by IDENT.  This rule allows context var tokens
+// to be used wherever an ordinary identifier is expected (field
+// names, option names, let bindings, etc.).
+varIdent
+    : IDENT
+    | PID | TID | UID | GID | CPU | COMM | NSECS
+    | SYSCALL | FUNC | LATENCY | RETVAL_KW | SIZE_KW | STACK_KW
+    | ARG0 | ARG1 | ARG2 | ARG3 | ARG4 | ARG5
+    ;
+
+// ---- Function Call ----
+funcCall
+    : IDENT LPAREN argList? RPAREN
+    ;
+
+argList
+    : expr (COMMA expr)*
     ;

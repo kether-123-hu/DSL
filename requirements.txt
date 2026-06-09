@@ -1,0 +1,11 @@
+# Emon DSL Skeleton —— Python Dependencies
+# Install: pip install -r requirements.txt
+
+# Core: Lark parser (Emon DSL grammar)
+lark-parser>=0.12.0
+
+# ANTLR4 Python runtime (for ANTLR4-generated parser integration)
+antlr4-python3-runtime>=4.13
+
+# YAML support (tool manifest parsing)
+PyYAML>=6.0
