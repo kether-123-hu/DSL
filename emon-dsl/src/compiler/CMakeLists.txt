@@ -1,23 +1,11 @@
-# Emon DSL 编译器子目录
-# 划分：lexer / parser / ast / semantic / ir / codegen
-add_subdirectory(lexer)
-add_subdirectory(parser)
-add_subdirectory(ast)
-add_subdirectory(semantic)
-add_subdirectory(ir)
+# Emon DSL 编译器子目录 (后端保留)
+# 前端 (lexer/parser/ast/semantic/ir) 已由 Python 实现替代
 add_subdirectory(codegen)
 
-# ---- 主编译器可执行文件 ----
+# ---- 主编译器可执行文件 (待实现) ----
 add_executable(emon-compiler
-    main.cc
-    lexer/emon_lexer.cc
-    parser/emon_parser.cc
-    ast/ast_nodes.cc
-    semantic/semantic_checker.cc
-    ir/ir_builder.cc
     codegen/ebpfc_generator.cc
     codegen/libbpf_loader_generator.cc
-    codegen/manifest_generator.cc
 )
 target_include_directories(emon-compiler PRIVATE
     ${CMAKE_SOURCE_DIR}/include
