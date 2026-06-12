@@ -3,6 +3,8 @@
 # =====================================================================
 # 目标：将高层声明式 DSL（tool / observe / where / measure / when /
 #       emit / every）翻译为 eBPF C + libbpf 加载器 + manifest
+#
+# 编译器全流程使用 Python 实现，C 仅用于运行时库（与 loader 静态链接）。
 # 文档对应：项目计划书模板 v0.01(7) 第 4–5 节
 # =====================================================================
 
@@ -12,31 +14,31 @@
                                      │
                         ┌────────────▼─────────────┐
                         │ Lexer / Parser           │
-                        │   grammar/*.g4           │
-                        │   src/compiler/{lexer,parser} │
+                        │   emon/lexer.py          │
+                        │   emon/parser.py         │
+                        │   grammar/emon.lark      │
                         └────────────┬─────────────┘
                                      │ AST
                         ┌────────────▼─────────────┐
                         │ AST & 语义检查           │
-                        │   include/emon/ast_nodes.h│
-                        │   semantic/              │
+                        │   emon/ast_nodes.py      │
+                        │   emon/semantic.py       │
                         └────────────┬─────────────┘
                                      │ IR
                         ┌────────────▼─────────────┐
                         │ 中间表示 IR Builder      │
-                        │   include/emon/ir.h      │
-                        │   ir/ir_builder.cc       │
+                        │   emon/ir.py             │
                         └────────────┬─────────────┘
                                      │
                  ┌───────────────────┼───────────────────┐
                  ▼                   ▼                   ▼
           eBPF C 源             libbpf loader      manifest YAML
-      codegen/ebpfc_generator  codegen/libbpf_*   codegen/manifest_*
+      emon/bpfc_gen.py       emon/loader_gen.py  emon/manifest_gen.py
                  │                   │                   │
                  │                   │                   │
         clang -target bpf       gcc + libbpf          可读配置
-                 │                   │
-                 ▼                   ▼
+                 │            + libemon-rt.a
+                 ▼                   │
               *.bpf.o          可执行 monitor 工具
                  │
           bpftool gen skeleton

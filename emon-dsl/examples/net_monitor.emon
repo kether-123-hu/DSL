@@ -1,0 +1,23 @@
+// ============================================================
+// Emon DSL Example: Network Events
+// Monitors network-related kernel functions.
+// ============================================================
+
+tool net_monitor {
+    option top_n = 5;
+}
+
+observe net("tcp_sendmsg", "tcp_recvmsg", "udp_sendmsg")
+measure latency
+{
+    @net_count[func, pid] = count();
+    @net_avg[func]        = avg(latency);
+
+    emit {
+        time    = nsecs;
+        func    = func;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}

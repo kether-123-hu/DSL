@@ -1,0 +1,26 @@
+// ============================================================
+// Emon DSL Example: Multi Observe
+// One tool with multiple observe blocks of different types.
+// ============================================================
+
+tool multi_monitor {
+    option interval = 2s;
+}
+
+// Block 1: syscall monitoring
+observe syscall("read", "write")
+{
+    @sys_count[comm, pid, syscall] = count();
+}
+
+// Block 2: scheduler events
+observe sched("sched_switch")
+{
+    @sched_count[cpu] = count();
+}
+
+every interval {
+    print("==== multi monitor ====");
+    print(@sys_count);
+    print(@sched_count);
+}

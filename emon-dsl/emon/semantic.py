@@ -43,8 +43,8 @@ _HOOK_CTX = {
     HookKind.TRACEPOINT: set(),
     HookKind.UPROBE:     {"func", "arg0", "arg1", "arg2", "arg3", "arg4", "arg5"},
     HookKind.SCHED:      set(),
-    HookKind.FILE:       set(),
-    HookKind.NET:        set(),
+    HookKind.FILE:       {"func", "arg0", "arg1", "arg2", "arg3", "arg4", "arg5"},
+    HookKind.NET:        {"func", "arg0", "arg1", "arg2", "arg3", "arg4", "arg5"},
 }
 
 # Measure-dependent context variables.

@@ -1,16 +1,6 @@
-# Emon DSL 编译器子目录 (后端保留)
-# 前端 (lexer/parser/ast/semantic/ir) 已由 Python 实现替代
-add_subdirectory(codegen)
-
-# ---- 主编译器可执行文件 (待实现) ----
-add_executable(emon-compiler
-    codegen/ebpfc_generator.cc
-    codegen/libbpf_loader_generator.cc
-)
-target_include_directories(emon-compiler PRIVATE
-    ${CMAKE_SOURCE_DIR}/include
-    ${CMAKE_SOURCE_DIR}/src/compiler)
-set_target_properties(emon-compiler PROPERTIES
-    OUTPUT_NAME "emon-compiler")
-
-message(STATUS "[compiler] emon-compiler 目标已配置")
+# Emon DSL 编译器子目录
+# C++ 前端/后端已全部迁移至 Python（emon/ 目录）。
+# 此目录保留作为占位，不再构建任何 C++ 目标。
+#
+# Python 编译器入口: emon-dsl/main.py
+message(STATUS "[compiler] C++ compiler deprecated — use Python: python3 main.py compile <file.emon>")

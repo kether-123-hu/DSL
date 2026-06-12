@@ -1,0 +1,30 @@
+// ============================================================
+// Emon DSL Example: Kernel Function Monitor
+// Monitors specified kernel functions via kprobe.
+// ============================================================
+
+tool kprobe_monitor {
+    option interval = 2s;
+    option top_n     = 10;
+}
+
+observe kernel("tcp_v4_connect", "tcp_v6_connect", "tcp_close")
+measure latency
+{
+    @k_count[func, pid, comm]    = count();
+    @k_avg[func, pid, comm]      = avg(latency);
+
+    emit {
+        time    = nsecs;
+        func    = func;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("==== kernel function summary ====");
+    print(top(@k_count, top_n));
+    print(@k_avg);
+}

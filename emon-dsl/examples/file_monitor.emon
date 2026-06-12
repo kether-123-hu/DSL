@@ -1,0 +1,29 @@
+// ============================================================
+// Emon DSL Example: File System Events
+// Monitors file operations via kprobe.
+// ============================================================
+
+tool file_monitor {
+    option interval = 3s;
+}
+
+observe file("vfs_read", "vfs_write", "vfs_open")
+measure latency
+{
+    @f_count[func, comm]   = count();
+    @f_avg[func, comm]     = avg(latency);
+
+    emit {
+        time    = nsecs;
+        func    = func;
+        comm    = comm;
+        pid     = pid;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("==== file operations summary ====");
+    print(@f_count);
+    print(@f_avg);
+}

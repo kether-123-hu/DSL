@@ -1,15 +1,17 @@
 """
 Emon DSL Intermediate Representation (IR)
 
-Bridges the Python frontend AST to the C++ backend code generators.
-The IR is serializable (JSON) so it can cross the Python/C++ boundary.
+Bridges the Python frontend AST to the Python backend code generators.
+The IR is a pure in-memory data structure — no JSON serialization needed
+since both frontend and backend are now Python.
 
-Design aligns with include/emon/ir.h.
+Design aligns with the project plan sections 5.3–5.4.
 """
 
 from dataclasses import dataclass, field, asdict
 from typing import List, Optional, Dict, Any
 import json
+import os
 
 from emon.ast_nodes import (
     Program, ObserveRule, EveryStmt, BeginStmt, EndStmt,
@@ -205,10 +207,10 @@ def _infer_field_type(var_name: str) -> str:
     type_map = {
         "pid": "u32", "tid": "u32", "uid": "u32", "gid": "u32",
         "cpu": "u32",
-        "comm": "char[16]",
+        "comm": "char [16]",
         "nsecs": "u64",
-        "syscall": "char[16]",
-        "func": "char[64]",
+        "syscall": "char [16]",
+        "func": "char [64]",
         "latency": "u64",
         "retval": "s64",
         "size": "u64",
@@ -282,7 +284,10 @@ class IRBuilder:
                 measures_latency=measures_latency,
             )
             self._fill_probe_conditions(entry, rule)
-            self._fill_probe_actions(entry, rule, ir, is_exit=False)
+            # Entry probe with latency: only where conditions, NO actions
+            # (actions referencing latency/retval only work on exit probe)
+            if not measures_latency:
+                self._fill_probe_actions(entry, rule, ir, is_exit=False)
             probes.append(entry)
 
             # Exit probe (only when latency is measured)
@@ -295,16 +300,31 @@ class IRBuilder:
                     measures_latency=True,
                 )
                 self._fill_probe_conditions(exit_probe, rule)
+                # Exit probe: ALL actions go here
                 self._fill_probe_actions(exit_probe, rule, ir, is_exit=True)
                 probes.append(exit_probe)
 
         return probes
 
     def _fill_probe_conditions(self, probe: IRProbe, rule: ObserveRule):
-        for wc in rule.wheres:
-            probe.where_conditions.append(_serialize_expr(wc.cond))
-        for wc in rule.whens:
-            probe.when_conditions.append(_serialize_expr(wc.cond))
+        """Fill where/when conditions respecting probe phase.
+
+        - where conditions: only on entry probes (pre-measurement filter)
+        - when conditions: only on exit probes (post-measurement filter)
+          or on entry probes when no latency is measured.
+        """
+        if not probe.is_exit:
+            # Entry probe: where conditions only
+            for wc in rule.wheres:
+                probe.where_conditions.append(_serialize_expr(wc.cond))
+            # If no latency measured, when conditions also go here
+            if not probe.measures_latency:
+                for wc in rule.whens:
+                    probe.when_conditions.append(_serialize_expr(wc.cond))
+        else:
+            # Exit probe: when conditions only
+            for wc in rule.whens:
+                probe.when_conditions.append(_serialize_expr(wc.cond))
 
     def _fill_probe_actions(self, probe: IRProbe, rule: ObserveRule,
                             ir: IRProgram, is_exit: bool):
@@ -463,3 +483,111 @@ def build_ir_from_source(source: str) -> IRProgram:
         messages = "; ".join(str(e) for e in errors)
         raise ValueError(f"Semantic errors: {messages}")
     return build_ir(ast)
+
+
+def compile_file(source_path: str, output_dir: str = ".") -> dict:
+    """Compile an .emon source file to all output artifacts.
+
+    Args:
+        source_path: Path to the .emon source file.
+        output_dir: Directory to write output files.
+
+    Returns:
+        Dict mapping artifact type to output file path.
+
+    Raises:
+        ValueError: If the source has semantic errors.
+        FileNotFoundError: If the source file doesn't exist.
+    """
+    from emon.bpfc_gen import generate_bpf_c
+    from emon.loader_gen import generate_loader_c
+    from emon.manifest_gen import generate_manifest
+
+    # Read source
+    with open(source_path, "r", encoding="utf-8") as f:
+        source = f.read()
+
+    # Full pipeline: parse → semantic → IR
+    from emon.parser import parse
+    from emon.semantic import analyze
+
+    ast = parse(source)
+    errors = analyze(ast)
+    if errors:
+        messages = "\n".join(f"  - {e}" for e in errors)
+        raise ValueError(
+            f"Semantic errors in '{source_path}':\n{messages}\n"
+            f"Total: {len(errors)} error(s)"
+        )
+
+    ir = build_ir(ast)
+
+    # Ensure output directory exists
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Base name for output files
+    safe_name = ir.tool_name.replace("-", "_").replace(".", "_")
+
+    results = {}
+
+    # eBPF C program
+    bpf_c_path = os.path.join(output_dir, f"{safe_name}.bpf.c")
+    with open(bpf_c_path, "w", encoding="utf-8") as f:
+        f.write(generate_bpf_c(ir))
+    results["bpf_c"] = bpf_c_path
+
+    # libbpf loader
+    loader_c_path = os.path.join(output_dir, f"{safe_name}_loader.c")
+    with open(loader_c_path, "w", encoding="utf-8") as f:
+        f.write(generate_loader_c(ir))
+    results["loader_c"] = loader_c_path
+
+    # Manifest
+    manifest_path = os.path.join(output_dir, f"{safe_name}.yaml")
+    with open(manifest_path, "w", encoding="utf-8") as f:
+        f.write(generate_manifest(ir))
+    results["manifest"] = manifest_path
+
+    return results
+
+
+def compile_source(source: str, tool_name: str = "emon_tool",
+                   output_dir: str = ".") -> dict:
+    """Compile Emon DSL source string to all output artifacts.
+
+    Args:
+        source: Emon DSL source code string.
+        tool_name: Name for the output files.
+        output_dir: Directory to write output files.
+
+    Returns:
+        Dict mapping artifact type to generated source string.
+
+    Raises:
+        ValueError: If the source has semantic errors.
+    """
+    from emon.bpfc_gen import generate_bpf_c
+    from emon.loader_gen import generate_loader_c
+    from emon.manifest_gen import generate_manifest
+
+    from emon.parser import parse
+    from emon.semantic import analyze
+
+    ast = parse(source)
+    errors = analyze(ast)
+    if errors:
+        messages = "\n".join(f"  - {e}" for e in errors)
+        raise ValueError(
+            f"Semantic errors:\n{messages}\n"
+            f"Total: {len(errors)} error(s)"
+        )
+
+    ir = build_ir(ast)
+
+    results = {}
+    results["bpf_c"] = generate_bpf_c(ir)
+    results["loader_c"] = generate_loader_c(ir)
+    results["manifest"] = generate_manifest(ir)
+    results["ir"] = ir
+
+    return results

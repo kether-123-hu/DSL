@@ -1,6 +1,6 @@
 # Emon DSL Frontend API Reference
 
-> Version: 0.1.0 | Python 3.10+
+> Version: 0.2.0 | Python 3.10+
 
 ---
 
@@ -15,6 +15,10 @@
    - [emon.ast_nodes — AST 节点类型](#34-emonast_nodes--ast-节点类型)
    - [emon.tokens — Token 类型](#35-emontokens--token-类型)
    - [emon.error — 错误类型](#36-emonerror--错误类型)
+   - [emon.ir — IR 构建与编译](#37-emonir--ir-构建与编译)
+   - [emon.bpfc_gen — eBPF C 代码生成](#38-emonbpfc_gen--ebpf-c-代码生成)
+   - [emon.loader_gen — libbpf Loader 生成](#39-emonloader_gen--libbpf-loader-生成)
+   - [emon.manifest_gen — YAML Manifest 生成](#310-emonmanifest_gen--yaml-manifest-生成)
 4. [CLI 使用](#4-cli-使用)
 5. [完整示例](#5-完整示例)
 
@@ -31,9 +35,19 @@
 │   词法分析    │     │   语法分析    │     │   语义分析    │
 └──────────────┘     └──────────────┘     └──────────────┘
   Token 列表           类型化 AST          错误列表 (空=合法)
+                            │
+                ┌───────────▼───────────┐
+                │       ir.py           │
+                │    IR 构建 + compile() │
+                └───────────┬───────────┘
+                            │
+         ┌──────────────────┼──────────────────┐
+         ▼                  ▼                  ▼
+   bpfc_gen.py       loader_gen.py     manifest_gen.py
+   eBPF C 源         libbpf loader     YAML manifest
 ```
 
-三层流水线，每层独立可调用。
+编译器全流程使用 Python 实现，无需 C++ 编译器参与。C 运行时库 (`src/runtime/`) 作为静态库链接到生成的 loader。
 
 ---
 

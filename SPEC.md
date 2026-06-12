@@ -1,163 +1,125 @@
-# 词法分析器 (Lexer) 规格文档
+# Emon DSL 项目规格说明书
 
-## 1. 项目概述
+> **E**BPF **Mon**itoring DSL — 面向 eBPF 可观测性的领域特定语言编译器
 
-- **项目名称**: Lexer - 词法分析器
-- **项目类型**: 编译原理教学/实用工具
-- **核心功能**: 对源代码进行词法分析，识别并提取各类词法单元（Token），生成包含类型、值、位置信息的输出
-- **目标用户**: 编译器学习者、教学工具开发者
+| 属性 | 值 |
+|------|-----|
+| 项目名称 | Emon DSL |
+| 版本 | 0.2.0 |
+| 语言 | Python 3.10+ / C (运行时库) |
+| 目标平台 | Linux x86_64 (Ubuntu 22.04+) |
+| 测试 | 195 个单元测试，全部通过 |
 
-## 2. 词法规则定义
+---
 
-### 2.1 Token 类型
+## 1. 项目目标
 
-| Token类型 | 说明 | 示例 |
-|-----------|------|------|
-| KEYWORD | 关键字 | if, else, while, for, return, int, float, void, etc. |
-| IDENTIFIER | 标识符 | variable, function_name, count, etc. |
-| INTEGER | 整数常量 | 42, -17, 0xFF, 0b1010 |
-| FLOAT | 浮点常量 | 3.14, -2.5, 1e10, 1.5e-3 |
-| STRING | 字符串常量 | "hello", 'world' |
-| OPERATOR | 运算符 | +, -, *, /, =, ==, !=, <, >, <=, >=, &&, \|\|, !, etc. |
-| DELIMITER | 分隔符 | (, ), {, }, [, ], ,, ;, :, . |
-| COMMENT | 注释 | // single line, /* multi-line */ |
-| WHITESPACE | 空白字符 | space, tab, newline (通常被忽略) |
-| NEWLINE | 换行符 | \n |
-| ERROR | 错误Token | 非法字符 |
+构建完整的 eBPF 可观测性工具编译链，用声明式 DSL 描述监控需求，编译器自动生成内核态 BPF 程序和用户态加载器。
 
-### 2.2 关键字列表
+---
+
+## 2. 系统架构
 
 ```
-if, else, while, for, do, switch, case, default, break, continue,
-return, goto, sizeof, typeof,
-int, long, short, char, float, double, void, signed, unsigned,
-const, static, extern, register, volatile,
-struct, union, enum, typedef,
-TRUE, FALSE, NULL
+.emon 源文件 → lexer.py → parser.py → semantic.py → ir.py
+                                                          │
+                              ┌───────────────────────────┤
+                              ▼               ▼           ▼
+                         bpfc_gen.py   loader_gen.py  manifest_gen.py
+                              │               │           │
+                         *.bpf.c       *_loader.c     *.yaml
+                              │               │
+                         clang           gcc + libbpf
+                              │               │
+                         *.bpf.o       可执行 monitor
 ```
 
-### 2.3 运算符列表
+编译器全流程 Python 实现，C 仅用于运行时库。
 
-```
-+, -, *, /, %, =, ==, !=, <, >, <=, >=,
-++, --, +=, -=, *=, /=, %=,
-&&, ||, !, &, |, ^, ~, <<, >>,
-<<=, >>=, &=, |=, ^=
-```
+---
 
-### 2.4 分隔符列表
+## 3. 语言特性
 
-```
-(, ), {, }, [, ], ,, ;, :, ., ?, ...
-```
+### 3.1 Hook 类型（7 种）
 
-### 2.5 标识符规则
+| Hook | 语法 | 底层机制 |
+|------|------|----------|
+| syscall | `observe syscall("read")` | tracepoint sys_enter/sys_exit |
+| kernel | `observe kernel("func")` | kprobe/kretprobe |
+| tracepoint | `observe tracepoint("cat:name")` | tracepoint |
+| uprobe | `observe uprobe("/bin/sh", "func")` | uprobe/uretprobe |
+| sched | `observe sched("sched_switch")` | tracepoint sched |
+| file | `observe file("vfs_read")` | kprobe |
+| net | `observe net("tcp_sendmsg")` | kprobe |
 
-- 首字符: 字母(A-Z, a-z) 或下划线(_)
-- 后续字符: 字母、数字(0-9) 或下划线(_)
-- 区分大小写
-- 不能与关键字相同
+### 3.2 聚合函数
 
-### 2.6 常量规则
+| 函数 | Map 类型 |
+|------|----------|
+| `count()` | HASH |
+| `sum/avg/min/max/hist/lhist` | PERCPU_HASH |
 
-- **整数**: 十进制(0-9), 十六进制(0x/0X开头), 二进制(0b/0B开头)
-- **浮点数**: 包含小数点或指数部分
-- **字符串**: 双引号或单引号包围，支持转义字符(\n, \t, \r, \\, \", \')
+### 3.3 控制结构
 
-### 2.7 注释规则
+`where` / `when` / `let` / `if-else` / `emit` / `every` / `begin` / `end`
 
-- **单行注释**: // 开头，到行尾结束
-- **多行注释**: /* */ 包裹，可跨行
+---
 
-## 3. 功能需求
+## 4. 编译器模块
 
-### 3.1 核心功能
+| 模块 | 功能 |
+|------|------|
+| `lexer.py` | 词法分析：源码 → Token 流 |
+| `parser.py` + `emon.lark` | 语法分析：Token 流 → 类型化 AST |
+| `semantic.py` | 语义检查：作用域、上下文变量、阶段限制 |
+| `ir.py` | IR 构建 + compile() 入口 |
+| `bpfc_gen.py` | eBPF C 代码生成 |
+| `loader_gen.py` | libbpf loader C 代码生成 |
+| `manifest_gen.py` | YAML manifest 生成 |
 
-- [x] 逐字符扫描源代码
-- [x] 识别各类Token
-- [x] 记录Token位置信息（行号、列号）
-- [x] 处理注释（忽略）
-- [x] 处理空白字符（忽略，但保留换行符位置）
-- [x] 错误恢复机制（遇到错误继续扫描）
+---
 
-### 3.2 输入输出
+## 5. 示例清单（8 个）
 
-- **输入**: 源代码字符串
-- **输出**: Token列表，每个Token包含:
-  - `type`: Token类型
-  - `value`: Token值
-  - `line`: 行号（从1开始）
-  - `column`: 列号（从1开始）
-  - `length`: Token长度
+| # | 文件 | 功能 |
+|---|------|------|
+| 1 | `syscall_count.emon` | 系统调用计数 |
+| 2 | `syscall_latency.emon` | 延迟监控 + ring buffer 事件 |
+| 3 | `full_feature_test.emon` | 全功能语法测试 |
+| 4 | `simple_filter.emon` | let/if 条件分支 |
+| 5 | `kprobe_monitor.emon` | 内核函数 kprobe 监控 |
+| 6 | `multi_monitor.emon` | 多 observe 块 |
+| 7 | `file_monitor.emon` | 文件系统事件 |
+| 8 | `net_monitor.emon` | 网络事件 |
 
-### 3.3 错误处理
+---
 
-- [x] 识别非法字符
-- [x] 识别未闭合的字符串
-- [x] 识别未闭合的注释
-- [x] 生成错误信息，包含错误位置
+## 6. 测试覆盖（195 tests）
 
-## 4. 技术实现
+| 测试文件 | 数量 |
+|----------|:--:|
+| `test_lexer.py` | ~30 |
+| `test_parser.py` | ~25 |
+| `test_semantic.py` | ~40 |
+| `test_ir.py` | ~30 |
+| `test_codegen.py` | ~70 |
 
-### 4.1 项目结构
+---
 
-```
-/home/liuyanze/dsl/
-├── SPEC.md
-├── lexer.py           # 词法分析器核心实现
-├── token.py           # Token类型定义
-├── error.py           # 错误处理
-├── test_lexer.py      # 测试用例
-└── main.py            # 主程序入口
-```
+## 7. 验收标准
 
-### 4.2 关键类/函数
+- [x] 8 个示例零错误编译（BPF + Loader）
+- [x] 运行时零崩溃
+- [x] 195 个单元测试全通过
+- [x] PERCPU map 正确处理
+- [x] Ctrl+C 可靠终止
+- [x] 实际系统采集真实监控数据
 
-- `Token` - Token数据结构
-- `TokenType` - Token类型枚举
-- `LexerError` - 词法错误异常
-- `Lexer` - 词法分析器主类
-  - `__init__(source: str)` - 初始化
-  - `tokenize() -> List[Token]` - 执行词法分析
-  - `_advance()` - 前进到下一个字符
-  - `_peek()` - 查看当前字符
-  - `_skip_whitespace()` - 跳过空白字符
-  - `_read_identifier()` - 读取标识符
-  - `_read_number()` - 读取数字
-  - `_read_string()` - 读取字符串
-  - `_read_operator()` - 读取运算符
-  - `_read_comment()` - 读取注释
+---
 
-## 5. 测试计划
+## 8. 已知限制
 
-### 5.1 正常情况测试
-
-- 关键字识别
-- 标识符识别
-- 整数常量识别
-- 浮点常量识别
-- 字符串常量识别
-- 运算符识别
-- 分隔符识别
-- 注释处理
-
-### 5.2 边界情况测试
-
-- 空输入
-- 仅有空白字符
-- 仅有注释
-- 非法字符
-- 未闭合字符串
-- 未闭合注释
-- 混合代码测试
-
-## 6. 验收标准
-
-- [x] 成功识别所有关键字
-- [x] 成功识别标识符
-- [x] 成功识别整数和浮点数
-- [x] 成功识别字符串
-- [x] 成功处理注释
-- [x] 正确报告词法错误
-- [x] 位置信息准确
-- [x] 测试覆盖核心功能
+1. `file`/`net`/`sched` hook 的 `size` 变量默认 0（无提取逻辑）
+2. Map key 输出为 hex+可读前缀混合格式
+3. 需要 root 权限运行
+4. Ubuntu 22.04 需从源码安装 libbpf ≥1.4

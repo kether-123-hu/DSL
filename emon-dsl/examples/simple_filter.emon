@@ -1,0 +1,27 @@
+// ============================================================
+// Emon DSL Example: Simple Filter with let/if
+// Demonstrates let variables and conditional branching.
+// ============================================================
+
+tool simple_filter {
+    option slow_threshold = 1ms;
+}
+
+observe syscall("read", "write")
+measure latency
+when latency > slow_threshold
+{
+    let is_very_slow = latency > 10000000;  // 10ms
+    if (is_very_slow) {
+        @very_slow[comm, pid] = count();
+    } else {
+        @slow[comm, pid] = count();
+    }
+
+    emit {
+        time    = nsecs;
+        comm    = comm;
+        pid     = pid;
+        latency = latency;
+    };
+}
