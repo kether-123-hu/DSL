@@ -81,6 +81,7 @@ class LoaderGenerator:
 #include <signal.h>
 #include <time.h>
 #include <errno.h>
+#include <sys/resource.h>
 #include <bpf/libbpf.h>
 #include <bpf/bpf.h>
 
@@ -100,6 +101,14 @@ static void __sigint_handler(int sig) {{
 
 static struct {tool}_bpf *__skel = NULL;
 static struct ring_buffer *__rb = NULL;
+
+static int __bump_memlock_rlimit(void) {{
+    struct rlimit rlim = {{
+        .rlim_cur = RLIM_INFINITY,
+        .rlim_max = RLIM_INFINITY,
+    }};
+    return setrlimit(RLIMIT_MEMLOCK, &rlim);
+}}
 
 // Use sigaction instead of signal() to avoid SA_RESTART,
 // which prevents Ctrl+C from interrupting sleep().
@@ -380,6 +389,7 @@ static void __print_map_{map_safe}(int top_n) {{
                             __handle_event, NULL, NULL);
     if (!__rb) {{
         fprintf(stderr, "Failed to create ring buffer\\n");
+        ret = 1;
         goto cleanup;
     }}"""
             rb_poll = f"""\
@@ -394,6 +404,7 @@ static void __print_map_{map_safe}(int top_n) {{
 
 int main(int argc, char **argv) {{
     int err;
+    int ret = 0;
 
     (void)argc; (void)argv;
 {opt_decls}
@@ -402,6 +413,11 @@ int main(int argc, char **argv) {{
 
     // ---- Signal handlers ----
     __setup_signals();
+
+    // ---- BPF memory lock limit ----
+    if (__bump_memlock_rlimit()) {{
+        fprintf(stderr, "Warning: failed to increase RLIMIT_MEMLOCK: %s\\n", strerror(errno));
+    }}
 
     // ---- Load BPF skeleton ----
     __skel = {tool}_bpf__open();
@@ -417,6 +433,7 @@ int main(int argc, char **argv) {{
     err = {tool}_bpf__load(__skel);
     if (err) {{
         fprintf(stderr, "Failed to load BPF skeleton: %d\\n", err);
+        ret = 1;
         goto cleanup;
     }}
 
@@ -424,6 +441,7 @@ int main(int argc, char **argv) {{
     err = {tool}_bpf__attach(__skel);
     if (err) {{
         fprintf(stderr, "Failed to attach BPF skeleton: %d\\n", err);
+        ret = 1;
         goto cleanup;
     }}
     fprintf(stderr, "[{self.ir.tool_name}] BPF programs loaded and attached.\\n");
@@ -452,7 +470,7 @@ cleanup:
         {tool}_bpf__destroy(__skel);
         __skel = NULL;
     }}
-    return 0;
+    return ret;
 }}"""
 
     def _emit_default_end_dump(self) -> str:

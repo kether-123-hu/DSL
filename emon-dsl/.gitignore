@@ -1,0 +1,8 @@
+.deps/
+build/
+benchmark/results/
+*.bpf.o
+*.skel.h
+*_loader
+__pycache__/
+*.pyc

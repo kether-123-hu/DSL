@@ -14,6 +14,10 @@ Usage:
 from pathlib import Path
 from typing import Optional
 
+from emon.deps import ensure_compiler_deps
+
+ensure_compiler_deps(auto_install=True)
+
 from lark import Lark, Token, Transformer
 
 from emon.ast_nodes import (

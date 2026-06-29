@@ -1,0 +1,13 @@
+tool bench_syscall_count {
+    option top = 20;
+}
+
+observe syscall("read", "write", "openat", "close")
+where pid > 0
+{
+    @syscall_count[comm, pid, syscall] = count();
+}
+
+every 1s {
+    print(top(@syscall_count, top));
+}

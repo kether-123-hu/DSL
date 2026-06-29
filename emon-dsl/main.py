@@ -7,6 +7,9 @@ Usage:
     python3 main.py check <source.emon>    语义检查
     python3 main.py ir <source.emon>       IR 构建 + JSON 输出
     python3 main.py compile <source.emon>  完整编译（生成 .bpf.c / _loader.c / .yaml）
+    python3 main.py build <source.emon>    生成 .bpf.o / skeleton / loader
+    python3 main.py run <source.emon>      编译并运行 loader
+    python3 main.py doctor                 检查本机工具链
     python3 main.py compile <source.emon> -o out/  指定输出目录
     python3 main.py                        交互式 REPL（词法分析）
 """
@@ -210,6 +213,62 @@ def cmd_compile(source_path: str, output_dir: str = "."):
     return results
 
 
+def cmd_doctor():
+    """Check local dependencies and eBPF toolchain readiness."""
+    from emon.toolchain import doctor
+
+    info = doctor()
+    print(f"{_bold('=== Emon DSL Doctor ===')}")
+    print()
+    print(f"Python:  {info['python']}")
+    print(f"Kernel:  {info['kernel']}")
+    print(f"libbpf:  {info['libbpf'] or 'not found'}")
+    print(f"BTF:     {info['btf'] or 'not found'}")
+    print()
+    print(_bold("Tools:"))
+    ok = True
+    for name, path in info["tools"].items():
+        if path:
+            print(f"  {_green('[ok]')} {name:10} {path}")
+        else:
+            ok = False
+            print(f"  {_red('[missing]')} {name}")
+    print()
+    if ok and info["btf"]:
+        print(_green("Build toolchain is ready."))
+    else:
+        print(_yellow("Build toolchain is incomplete."))
+    if not info["can_run_loader_without_sudo"]:
+        print(_yellow("Running loaders may require sudo or CAP_BPF/CAP_PERFMON."))
+    return ok
+
+
+def cmd_build(source_path: str, output_dir: str | None = None):
+    """Build .emon into a runnable userspace loader."""
+    from emon.toolchain import build, write_build_report
+
+    print(f"{_bold('=== Emon DSL Build ===')}")
+    result = build(source_path, output_dir=output_dir, verbose=True)
+    report = os.path.join(result.output_dir, "build-report.json")
+    write_build_report(result, report)
+    print()
+    print(_green(_bold("Build successful!")))
+    print(f"  loader: {result.loader}")
+    print(f"  report: {report}")
+    return result
+
+
+def cmd_run(source_path: str, output_dir: str | None = None,
+            duration: float | None = None, sudo: bool = False):
+    """Build and run a monitor."""
+    from emon.toolchain import run
+
+    rc = run(source_path, output_dir=output_dir, duration=duration, sudo=sudo)
+    if rc not in (0, -15):
+        print(_yellow(f"Runner exited with status {rc}"))
+    return rc
+
+
 def cmd_repl():
     """Interactive REPL mode."""
     print(_bold("Emon DSL Interactive REPL"))
@@ -260,7 +319,9 @@ Examples:
   python3 main.py check examples/syscall_count.emon
   python3 main.py ir examples/syscall_count.emon
   python3 main.py compile examples/syscall_count.emon
-  python3 main.py compile examples/syscall_count.emon -o build/
+  python3 main.py build examples/syscall_count.emon
+  python3 main.py run examples/syscall_count.emon --sudo
+  python3 main.py doctor
   python3 main.py
         """,
     )
@@ -283,10 +344,30 @@ Examples:
     compile_parser.add_argument("file", help="Emon DSL source file (.emon)")
     compile_parser.add_argument("-o", "--output", default=".", help="Output directory (default: .)")
 
+    build_parser = subparsers.add_parser("build", help="Compile to BPF object + skeleton + loader")
+    build_parser.add_argument("file", help="Emon DSL source file (.emon)")
+    build_parser.add_argument("-o", "--output", default=None, help="Output directory")
+
+    run_parser = subparsers.add_parser("run", help="Build and run a monitor")
+    run_parser.add_argument("file", help="Emon DSL source file (.emon)")
+    run_parser.add_argument("-o", "--output", default=None, help="Output directory")
+    run_parser.add_argument("--duration", type=float, default=None,
+                            help="Stop after N seconds (useful for smoke tests)")
+    run_parser.add_argument("--sudo", action="store_true",
+                            help="Run loader through sudo when not root")
+
+    subparsers.add_parser("doctor", help="Check local toolchain")
+
     args = parser.parse_args()
 
     if not args.command:
         cmd_repl()
+        return
+
+    if args.command == "doctor":
+        ok = cmd_doctor()
+        if not ok:
+            sys.exit(1)
         return
 
     filepath = args.file
@@ -312,6 +393,16 @@ Examples:
         result = cmd_compile(filepath, output_dir)
         if result is None:
             sys.exit(1)
+    elif args.command == "build":
+        cmd_build(filepath, getattr(args, 'output', None))
+    elif args.command == "run":
+        rc = cmd_run(
+            filepath,
+            output_dir=getattr(args, 'output', None),
+            duration=getattr(args, 'duration', None),
+            sudo=getattr(args, 'sudo', False),
+        )
+        sys.exit(0 if rc in (0, -15) else rc)
 
 
 if __name__ == '__main__':
