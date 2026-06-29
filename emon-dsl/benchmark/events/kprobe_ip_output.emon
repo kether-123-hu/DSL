@@ -1,0 +1,30 @@
+// ============================================================
+// Benchmark: events - kprobe_ip_output
+// Tests kprobe ip output event monitoring
+// ============================================================
+
+tool kprobe_ip_output_event {
+    option interval = 5s;
+}
+
+    observe kernel("ip_output")
+measure count, latency
+{
+    @kprobe_ip_output_count[pid, comm] = count();
+    @kprobe_ip_output_avg[pid, comm]   = avg(latency);
+    @kprobe_ip_output_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== kprobe ip output events ===");
+    print(@kprobe_ip_output_count);
+    print(@kprobe_ip_output_avg);
+    print(@kprobe_ip_output_hist);
+}

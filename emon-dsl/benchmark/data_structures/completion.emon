@@ -1,0 +1,27 @@
+// ============================================================
+// Benchmark: data_structures - completion
+// Tests monitoring completion and event handling
+// ============================================================
+
+tool completion_ds {
+    option interval = 5s;
+}
+
+observe syscall("eventfd", "signalfd", "epoll_create1")
+measure count, retval
+{
+    @completion_count[comm, syscall] = count();
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        syscall = syscall;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== completion stats ===");
+    print(@completion_count);
+}

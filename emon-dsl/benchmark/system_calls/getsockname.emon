@@ -1,0 +1,31 @@
+// ============================================================
+// Benchmark: system_calls - getsockname
+// Tests getsockname syscall monitoring with latency and return value tracking
+// ============================================================
+
+tool getsockname_syscall {
+    option interval = 5s;
+}
+
+observe syscall("getsockname")
+measure latency, retval
+{
+    @getsockname_count[pid, comm] = count();
+    @getsockname_avg[pid, comm]   = avg(latency);
+    @getsockname_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== getsockname syscall stats ===");
+    print(@getsockname_count);
+    print(@getsockname_avg);
+    print(@getsockname_hist);
+}

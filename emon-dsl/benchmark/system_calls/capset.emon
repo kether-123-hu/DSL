@@ -1,0 +1,31 @@
+// ============================================================
+// Benchmark: system_calls - capset
+// Tests capset syscall monitoring with latency and return value tracking
+// ============================================================
+
+tool capset_syscall {
+    option interval = 5s;
+}
+
+observe syscall("capset")
+measure latency, retval
+{
+    @capset_count[pid, comm] = count();
+    @capset_avg[pid, comm]   = avg(latency);
+    @capset_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== capset syscall stats ===");
+    print(@capset_count);
+    print(@capset_avg);
+    print(@capset_hist);
+}

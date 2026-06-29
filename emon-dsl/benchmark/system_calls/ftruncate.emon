@@ -1,0 +1,31 @@
+// ============================================================
+// Benchmark: system_calls - ftruncate
+// Tests ftruncate syscall monitoring with latency and return value tracking
+// ============================================================
+
+tool ftruncate_syscall {
+    option interval = 5s;
+}
+
+observe syscall("ftruncate")
+measure latency, retval
+{
+    @ftruncate_count[pid, comm] = count();
+    @ftruncate_avg[pid, comm]   = avg(latency);
+    @ftruncate_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== ftruncate syscall stats ===");
+    print(@ftruncate_count);
+    print(@ftruncate_avg);
+    print(@ftruncate_hist);
+}

@@ -1,0 +1,28 @@
+// ============================================================
+// Benchmark: functions - kmem_cache_alloc_node
+// Tests kernel function kprobe for kmem cache alloc node
+// ============================================================
+
+tool kmem_cache_alloc_node_func {
+    option interval = 5s;
+}
+
+observe kernel("kmem_cache_alloc_node")
+measure latency
+{
+    @kmem_cache_alloc_node_count[pid, comm] = count();
+    @kmem_cache_alloc_node_avg[pid, comm]   = avg(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== kmem_cache_alloc_node kernel function ===");
+    print(@kmem_cache_alloc_node_count);
+    print(@kmem_cache_alloc_node_avg);
+}

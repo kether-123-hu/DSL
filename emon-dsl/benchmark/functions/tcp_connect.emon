@@ -1,0 +1,29 @@
+// ============================================================
+// Benchmark: functions - tcp_connect
+// Tests kernel function kprobe monitoring for TCP connections
+// ============================================================
+
+tool tcp_connect_func {
+    option interval = 5s;
+}
+
+observe kernel("tcp_v4_connect", "tcp_v6_connect", "tcp_close")
+measure latency
+{
+    @tcp_count[func, pid, comm] = count();
+    @tcp_avg[func, pid, comm]  = avg(latency);
+
+    emit {
+        time    = nsecs;
+        func    = func;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== TCP connect kernel functions ===");
+    print(@tcp_count);
+    print(@tcp_avg);
+}

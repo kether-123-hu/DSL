@@ -1,0 +1,28 @@
+// ============================================================
+// Benchmark: functions - __free_pages
+// Tests kernel function kprobe for   free pages
+// ============================================================
+
+tool __free_pages_func {
+    option interval = 5s;
+}
+
+observe kernel("__free_pages")
+measure latency
+{
+    @__free_pages_count[pid, comm] = count();
+    @__free_pages_avg[pid, comm]   = avg(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== __free_pages kernel function ===");
+    print(@__free_pages_count);
+    print(@__free_pages_avg);
+}

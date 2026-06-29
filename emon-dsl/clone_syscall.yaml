@@ -1,0 +1,100 @@
+# =====================================================================
+# Emon DSL Tool Manifest —— clone_syscall
+# 由 Emon DSL 编译器自动生成
+# 格式版本: 0.1
+# 生成日期: (auto-generated)
+# =====================================================================
+
+tool:
+  name: clone_syscall
+  version: "0.1"
+  description: >
+    Emon DSL 生成的 eBPF 可观测性工具
+  language: emon-dsl
+  target: bpf
+  options:
+    interval: 5s
+
+maps:
+  - name: clone_count
+    type: hash
+    key_fields: [pid, comm, syscall]
+    value_type: u64
+    max_entries: 10240
+
+probes:
+  - section: tracepoint/syscalls/sys_enter_clone
+    kind: syscall
+    target: clone
+    is_exit: false
+    measures_latency: false
+  - section: tracepoint/syscalls/sys_exit_clone
+    kind: syscall
+    target: clone
+    is_exit: true
+    measures_latency: false
+    aggregations:
+      - map: clone_count
+        fn: count
+        keys: [pid, comm, syscall]
+    emits: 1 event(s)
+  - section: tracepoint/syscalls/sys_enter_fork
+    kind: syscall
+    target: fork
+    is_exit: false
+    measures_latency: false
+  - section: tracepoint/syscalls/sys_exit_fork
+    kind: syscall
+    target: fork
+    is_exit: true
+    measures_latency: false
+    aggregations:
+      - map: clone_count
+        fn: count
+        keys: [pid, comm, syscall]
+    emits: 1 event(s)
+  - section: tracepoint/syscalls/sys_enter_vfork
+    kind: syscall
+    target: vfork
+    is_exit: false
+    measures_latency: false
+  - section: tracepoint/syscalls/sys_exit_vfork
+    kind: syscall
+    target: vfork
+    is_exit: true
+    measures_latency: false
+    aggregations:
+      - map: clone_count
+        fn: count
+        keys: [pid, comm, syscall]
+    emits: 1 event(s)
+
+events:
+  - name: event_clone_syscall
+    type: ringbuf
+    fields:
+      - name: time
+        type: u64
+      - name: pid
+        type: u32
+      - name: comm
+        type: char [16]
+      - name: syscall
+        type: char [16]
+      - name: retval
+        type: s64
+
+lifecycle:
+  begin: []
+  every:
+    - interval: interval
+      prints:
+        - "=== clone/fork syscall stats ==="
+        - @clone_count
+      agg_reads: [clone_count]
+  end: []
+
+outputs:
+  - kind: stdout
+    format: table
+    refresh: 1s

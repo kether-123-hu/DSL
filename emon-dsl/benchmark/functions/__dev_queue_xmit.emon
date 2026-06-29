@@ -1,0 +1,28 @@
+// ============================================================
+// Benchmark: functions - __dev_queue_xmit
+// Tests kernel function kprobe for   dev queue xmit
+// ============================================================
+
+tool __dev_queue_xmit_func {
+    option interval = 5s;
+}
+
+observe kernel("__dev_queue_xmit")
+measure latency
+{
+    @__dev_queue_xmit_count[pid, comm] = count();
+    @__dev_queue_xmit_avg[pid, comm]   = avg(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== __dev_queue_xmit kernel function ===");
+    print(@__dev_queue_xmit_count);
+    print(@__dev_queue_xmit_avg);
+}

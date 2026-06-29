@@ -1,0 +1,28 @@
+// ============================================================
+// Benchmark: functions - bpf_prog_load
+// Tests kernel function kprobe for bpf prog load
+// ============================================================
+
+tool bpf_prog_load_func {
+    option interval = 5s;
+}
+
+observe kernel("bpf_prog_load")
+measure latency
+{
+    @bpf_prog_load_count[pid, comm] = count();
+    @bpf_prog_load_avg[pid, comm]   = avg(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== bpf_prog_load kernel function ===");
+    print(@bpf_prog_load_count);
+    print(@bpf_prog_load_avg);
+}

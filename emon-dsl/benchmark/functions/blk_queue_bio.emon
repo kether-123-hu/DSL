@@ -1,0 +1,28 @@
+// ============================================================
+// Benchmark: functions - blk_queue_bio
+// Tests kernel function kprobe for blk queue bio
+// ============================================================
+
+tool blk_queue_bio_func {
+    option interval = 5s;
+}
+
+observe kernel("blk_queue_bio")
+measure latency
+{
+    @blk_queue_bio_count[pid, comm] = count();
+    @blk_queue_bio_avg[pid, comm]   = avg(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== blk_queue_bio kernel function ===");
+    print(@blk_queue_bio_count);
+    print(@blk_queue_bio_avg);
+}

@@ -1,0 +1,28 @@
+// ============================================================
+// Benchmark: functions - bio_end_io
+// Tests kernel function kprobe for bio end io
+// ============================================================
+
+tool bio_end_io_func {
+    option interval = 5s;
+}
+
+observe kernel("bio_end_io")
+measure latency
+{
+    @bio_end_io_count[pid, comm] = count();
+    @bio_end_io_avg[pid, comm]   = avg(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== bio_end_io kernel function ===");
+    print(@bio_end_io_count);
+    print(@bio_end_io_avg);
+}

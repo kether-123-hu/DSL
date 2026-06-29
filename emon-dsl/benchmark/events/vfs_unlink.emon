@@ -1,0 +1,30 @@
+// ============================================================
+// Benchmark: events - vfs_unlink
+// Tests vfs unlink event monitoring
+// ============================================================
+
+tool vfs_unlink_event {
+    option interval = 5s;
+}
+
+    observe file("vfs_unlink", "do_unlinkat")
+measure count, latency
+{
+    @vfs_unlink_count[pid, comm] = count();
+    @vfs_unlink_avg[pid, comm]   = avg(latency);
+    @vfs_unlink_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== vfs unlink events ===");
+    print(@vfs_unlink_count);
+    print(@vfs_unlink_avg);
+    print(@vfs_unlink_hist);
+}

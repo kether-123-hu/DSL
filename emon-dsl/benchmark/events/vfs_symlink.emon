@@ -1,0 +1,30 @@
+// ============================================================
+// Benchmark: events - vfs_symlink
+// Tests vfs symlink event monitoring
+// ============================================================
+
+tool vfs_symlink_event {
+    option interval = 5s;
+}
+
+    observe file("vfs_symlink", "do_symlink")
+measure count, latency
+{
+    @vfs_symlink_count[pid, comm] = count();
+    @vfs_symlink_avg[pid, comm]   = avg(latency);
+    @vfs_symlink_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== vfs symlink events ===");
+    print(@vfs_symlink_count);
+    print(@vfs_symlink_avg);
+    print(@vfs_symlink_hist);
+}

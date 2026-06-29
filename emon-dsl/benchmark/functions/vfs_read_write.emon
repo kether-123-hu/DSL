@@ -1,0 +1,29 @@
+// ============================================================
+// Benchmark: functions - vfs_read_write
+// Tests kernel function kprobe for VFS read/write operations
+// ============================================================
+
+tool vfs_read_write_func {
+    option interval = 5s;
+}
+
+observe kernel("vfs_read", "vfs_write", "vfs_read_iter", "vfs_write_iter")
+measure latency
+{
+    @vfs_count[func, pid, comm] = count();
+    @vfs_avg[func, pid, comm]   = avg(latency);
+
+    emit {
+        time    = nsecs;
+        func    = func;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== vfs_read_write kernel functions ===");
+    print(@vfs_count);
+    print(@vfs_avg);
+}

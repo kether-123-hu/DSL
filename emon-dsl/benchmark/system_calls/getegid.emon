@@ -1,0 +1,31 @@
+// ============================================================
+// Benchmark: system_calls - getegid
+// Tests getegid syscall monitoring with latency and return value tracking
+// ============================================================
+
+tool getegid_syscall {
+    option interval = 5s;
+}
+
+observe syscall("getegid")
+measure latency, retval
+{
+    @getegid_count[pid, comm] = count();
+    @getegid_avg[pid, comm]   = avg(latency);
+    @getegid_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== getegid syscall stats ===");
+    print(@getegid_count);
+    print(@getegid_avg);
+    print(@getegid_hist);
+}

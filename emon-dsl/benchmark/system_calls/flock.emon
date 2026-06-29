@@ -1,0 +1,31 @@
+// ============================================================
+// Benchmark: system_calls - flock
+// Tests flock syscall monitoring with latency and return value tracking
+// ============================================================
+
+tool flock_syscall {
+    option interval = 5s;
+}
+
+observe syscall("flock")
+measure latency, retval
+{
+    @flock_count[pid, comm] = count();
+    @flock_avg[pid, comm]   = avg(latency);
+    @flock_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== flock syscall stats ===");
+    print(@flock_count);
+    print(@flock_avg);
+    print(@flock_hist);
+}

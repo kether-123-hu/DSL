@@ -1,0 +1,31 @@
+// ============================================================
+// Benchmark: system_calls - exit_group
+// Tests exit_group syscall monitoring with latency and return value tracking
+// ============================================================
+
+tool exit_group_syscall {
+    option interval = 5s;
+}
+
+observe syscall("exit_group")
+measure latency, retval
+{
+    @exit_group_count[pid, comm] = count();
+    @exit_group_avg[pid, comm]   = avg(latency);
+    @exit_group_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== exit group syscall stats ===");
+    print(@exit_group_count);
+    print(@exit_group_avg);
+    print(@exit_group_hist);
+}

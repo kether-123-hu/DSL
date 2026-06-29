@@ -1,0 +1,28 @@
+// ============================================================
+// Benchmark: events - file_open
+// Tests file open event monitoring
+// ============================================================
+
+tool file_open_event {
+    option interval = 5s;
+}
+
+observe file("vfs_open", "do_filp_open")
+measure latency
+{
+    @open_count[pid, comm] = count();
+    @open_avg[pid, comm]   = avg(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== file open events ===");
+    print(@open_count);
+    print(@open_avg);
+}

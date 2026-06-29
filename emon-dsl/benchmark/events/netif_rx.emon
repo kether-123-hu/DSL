@@ -1,0 +1,30 @@
+// ============================================================
+// Benchmark: events - netif_rx
+// Tests netif rx event monitoring
+// ============================================================
+
+tool netif_rx_event {
+    option interval = 5s;
+}
+
+    observe tracepoint("net:netif_rx")
+measure count, latency
+{
+    @netif_rx_count[pid, comm] = count();
+    @netif_rx_avg[pid, comm]   = avg(latency);
+    @netif_rx_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== netif rx events ===");
+    print(@netif_rx_count);
+    print(@netif_rx_avg);
+    print(@netif_rx_hist);
+}

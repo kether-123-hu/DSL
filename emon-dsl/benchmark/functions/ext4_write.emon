@@ -1,0 +1,29 @@
+// ============================================================
+// Benchmark: functions - ext4_write
+// Tests kernel function kprobe for ext4 filesystem writes
+// ============================================================
+
+tool ext4_write_func {
+    option interval = 5s;
+}
+
+observe kernel("ext4_file_write_iter", "ext4_da_write_begin", "ext4_da_write_end")
+measure latency
+{
+    @ext4_count[func, pid, comm] = count();
+    @ext4_avg[func, pid, comm]  = avg(latency);
+
+    emit {
+        time    = nsecs;
+        func    = func;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== ext4 write kernel functions ===");
+    print(@ext4_count);
+    print(@ext4_avg);
+}

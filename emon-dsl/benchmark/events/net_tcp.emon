@@ -1,0 +1,31 @@
+// ============================================================
+// Benchmark: events - net_tcp
+// Tests TCP network event monitoring
+// ============================================================
+
+tool net_tcp_event {
+    option interval = 5s;
+}
+
+observe net("tcp_sendmsg", "tcp_recvmsg", "tcp_connect")
+measure latency
+{
+    @tcp_count[pid, func] = count();
+    @tcp_avg[pid, func]  = avg(latency);
+    @tcp_hist[func]      = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        func    = func;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== TCP network events ===");
+    print(@tcp_count);
+    print(@tcp_avg);
+    print(@tcp_hist);
+}

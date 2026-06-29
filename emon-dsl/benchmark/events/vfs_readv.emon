@@ -1,0 +1,30 @@
+// ============================================================
+// Benchmark: events - vfs_readv
+// Tests vfs readv event monitoring
+// ============================================================
+
+tool vfs_readv_event {
+    option interval = 5s;
+}
+
+    observe file("vfs_read", "vfs_iter_read")
+measure count, latency
+{
+    @vfs_readv_count[pid, comm] = count();
+    @vfs_readv_avg[pid, comm]   = avg(latency);
+    @vfs_readv_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== vfs readv events ===");
+    print(@vfs_readv_count);
+    print(@vfs_readv_avg);
+    print(@vfs_readv_hist);
+}

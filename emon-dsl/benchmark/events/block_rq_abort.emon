@@ -1,0 +1,30 @@
+// ============================================================
+// Benchmark: events - block_rq_abort
+// Tests block rq abort event monitoring
+// ============================================================
+
+tool block_rq_abort_event {
+    option interval = 5s;
+}
+
+    observe tracepoint("block:block_rq_abort")
+measure count, latency
+{
+    @block_rq_abort_count[pid, comm] = count();
+    @block_rq_abort_avg[pid, comm]   = avg(latency);
+    @block_rq_abort_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== block rq abort events ===");
+    print(@block_rq_abort_count);
+    print(@block_rq_abort_avg);
+    print(@block_rq_abort_hist);
+}

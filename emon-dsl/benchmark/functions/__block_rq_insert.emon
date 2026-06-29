@@ -1,0 +1,28 @@
+// ============================================================
+// Benchmark: functions - __block_rq_insert
+// Tests kernel function kprobe for   block rq insert
+// ============================================================
+
+tool __block_rq_insert_func {
+    option interval = 5s;
+}
+
+observe kernel("__block_rq_insert")
+measure latency
+{
+    @__block_rq_insert_count[pid, comm] = count();
+    @__block_rq_insert_avg[pid, comm]   = avg(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== __block_rq_insert kernel function ===");
+    print(@__block_rq_insert_count);
+    print(@__block_rq_insert_avg);
+}

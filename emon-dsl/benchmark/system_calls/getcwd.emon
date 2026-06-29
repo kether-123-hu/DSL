@@ -1,0 +1,31 @@
+// ============================================================
+// Benchmark: system_calls - getcwd
+// Tests getcwd syscall monitoring with latency and return value tracking
+// ============================================================
+
+tool getcwd_syscall {
+    option interval = 5s;
+}
+
+observe syscall("getcwd")
+measure latency, retval
+{
+    @getcwd_count[pid, comm] = count();
+    @getcwd_avg[pid, comm]   = avg(latency);
+    @getcwd_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== getcwd syscall stats ===");
+    print(@getcwd_count);
+    print(@getcwd_avg);
+    print(@getcwd_hist);
+}

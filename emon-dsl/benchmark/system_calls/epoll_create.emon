@@ -1,0 +1,31 @@
+// ============================================================
+// Benchmark: system_calls - epoll_create
+// Tests epoll_create syscall monitoring with latency and return value tracking
+// ============================================================
+
+tool epoll_create_syscall {
+    option interval = 5s;
+}
+
+observe syscall("epoll_create")
+measure latency, retval
+{
+    @epoll_create_count[pid, comm] = count();
+    @epoll_create_avg[pid, comm]   = avg(latency);
+    @epoll_create_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== epoll create syscall stats ===");
+    print(@epoll_create_count);
+    print(@epoll_create_avg);
+    print(@epoll_create_hist);
+}

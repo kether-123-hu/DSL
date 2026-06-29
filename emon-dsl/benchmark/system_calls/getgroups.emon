@@ -1,0 +1,31 @@
+// ============================================================
+// Benchmark: system_calls - getgroups
+// Tests getgroups syscall monitoring with latency and return value tracking
+// ============================================================
+
+tool getgroups_syscall {
+    option interval = 5s;
+}
+
+observe syscall("getgroups")
+measure latency, retval
+{
+    @getgroups_count[pid, comm] = count();
+    @getgroups_avg[pid, comm]   = avg(latency);
+    @getgroups_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== getgroups syscall stats ===");
+    print(@getgroups_count);
+    print(@getgroups_avg);
+    print(@getgroups_hist);
+}

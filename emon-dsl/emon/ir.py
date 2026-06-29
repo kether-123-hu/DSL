@@ -270,6 +270,10 @@ class IRBuilder:
         measures_latency = any(
             Metric.LATENCY in mc.metrics for mc in rule.measures
         )
+        measures_retval = any(
+            Metric.RETVAL in mc.metrics for mc in rule.measures
+        )
+        needs_exit_probe = measures_latency or measures_retval
         targets = rule.hook.targets
         hook_kind = rule.hook.kind
 
@@ -283,42 +287,40 @@ class IRBuilder:
                 is_exit=False,
                 measures_latency=measures_latency,
             )
-            self._fill_probe_conditions(entry, rule)
-            # Entry probe with latency: only where conditions, NO actions
-            # (actions referencing latency/retval only work on exit probe)
-            if not measures_latency:
+            self._fill_probe_conditions(entry, rule, include_when=not needs_exit_probe)
+            # If we do not need a separate exit probe, actions can run on entry.
+            if not needs_exit_probe:
                 self._fill_probe_actions(entry, rule, ir, is_exit=False)
             probes.append(entry)
 
-            # Exit probe (only when latency is measured)
-            if measures_latency:
+            # Exit probe for latency or retval measurements
+            if needs_exit_probe:
                 exit_probe = IRProbe(
                     section=_make_section(hook_kind, target, True),
                     hook_kind=hook_kind.name,
                     hook_target=target,
                     is_exit=True,
-                    measures_latency=True,
+                    measures_latency=measures_latency,
                 )
-                self._fill_probe_conditions(exit_probe, rule)
-                # Exit probe: ALL actions go here
+                self._fill_probe_conditions(exit_probe, rule, include_when=True)
                 self._fill_probe_actions(exit_probe, rule, ir, is_exit=True)
                 probes.append(exit_probe)
 
         return probes
 
-    def _fill_probe_conditions(self, probe: IRProbe, rule: ObserveRule):
+    def _fill_probe_conditions(self, probe: IRProbe, rule: ObserveRule,
+                               include_when: bool = False):
         """Fill where/when conditions respecting probe phase.
 
         - where conditions: only on entry probes (pre-measurement filter)
-        - when conditions: only on exit probes (post-measurement filter)
-          or on entry probes when no latency is measured.
+        - when conditions: on exit probes or entry probes when allowed.
         """
         if not probe.is_exit:
             # Entry probe: where conditions only
             for wc in rule.wheres:
                 probe.where_conditions.append(_serialize_expr(wc.cond))
-            # If no latency measured, when conditions also go here
-            if not probe.measures_latency:
+            # Entry probe may also include when conditions if no separate exit probe.
+            if include_when:
                 for wc in rule.whens:
                     probe.when_conditions.append(_serialize_expr(wc.cond))
         else:

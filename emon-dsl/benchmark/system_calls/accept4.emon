@@ -1,0 +1,31 @@
+// ============================================================
+// Benchmark: system_calls - accept4
+// Tests accept4 syscall monitoring with latency and return value tracking
+// ============================================================
+
+tool accept4_syscall {
+    option interval = 5s;
+}
+
+observe syscall("accept4")
+measure latency, retval
+{
+    @accept4_count[pid, comm] = count();
+    @accept4_avg[pid, comm]   = avg(latency);
+    @accept4_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== accept4 syscall stats ===");
+    print(@accept4_count);
+    print(@accept4_avg);
+    print(@accept4_hist);
+}

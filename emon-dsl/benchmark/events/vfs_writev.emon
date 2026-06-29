@@ -1,0 +1,30 @@
+// ============================================================
+// Benchmark: events - vfs_writev
+// Tests vfs writev event monitoring
+// ============================================================
+
+tool vfs_writev_event {
+    option interval = 5s;
+}
+
+    observe file("vfs_write", "vfs_iter_write")
+measure count, latency
+{
+    @vfs_writev_count[pid, comm] = count();
+    @vfs_writev_avg[pid, comm]   = avg(latency);
+    @vfs_writev_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== vfs writev events ===");
+    print(@vfs_writev_count);
+    print(@vfs_writev_avg);
+    print(@vfs_writev_hist);
+}

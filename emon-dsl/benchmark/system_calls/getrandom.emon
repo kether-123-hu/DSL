@@ -1,0 +1,31 @@
+// ============================================================
+// Benchmark: system_calls - getrandom
+// Tests getrandom syscall monitoring with latency and return value tracking
+// ============================================================
+
+tool getrandom_syscall {
+    option interval = 5s;
+}
+
+observe syscall("getrandom")
+measure latency, retval
+{
+    @getrandom_count[pid, comm] = count();
+    @getrandom_avg[pid, comm]   = avg(latency);
+    @getrandom_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== getrandom syscall stats ===");
+    print(@getrandom_count);
+    print(@getrandom_avg);
+    print(@getrandom_hist);
+}

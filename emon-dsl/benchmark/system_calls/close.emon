@@ -1,0 +1,26 @@
+// ============================================================
+// Benchmark: system_calls - close
+// Tests close syscall monitoring (no latency needed)
+// ============================================================
+
+tool close_syscall {
+    option interval = 5s;
+}
+
+observe syscall("close")
+measure count, retval
+{
+    @close_count[pid, comm] = count();
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== close syscall stats ===");
+    print(@close_count);
+}

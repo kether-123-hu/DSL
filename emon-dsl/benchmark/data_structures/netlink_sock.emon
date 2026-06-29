@@ -1,0 +1,27 @@
+// ============================================================
+// Benchmark: data_structures - netlink_sock
+// Tests monitoring netlink socket events
+// ============================================================
+
+tool netlink_sock_ds {
+    option interval = 5s;
+}
+
+observe syscall("socket", "sendto", "recvfrom")
+measure count, retval
+{
+    @netlink_sock_count[comm, syscall] = count();
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        syscall = syscall;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== netlink_sock stats ===");
+    print(@netlink_sock_count);
+}

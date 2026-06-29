@@ -1,0 +1,25 @@
+// ============================================================
+// Benchmark: events - sched_wakeup
+// Tests scheduler wakeup event monitoring
+// ============================================================
+
+tool sched_wakeup_event {
+    option interval = 5s;
+}
+
+observe sched("sched_wakeup", "sched_wakeup_new")
+measure count
+{
+    @wakeup_count[cpu, comm] = count();
+
+    emit {
+        time = nsecs;
+        cpu  = cpu;
+        comm = comm;
+    };
+}
+
+every interval {
+    print("=== sched_wakeup events ===");
+    print(@wakeup_count);
+}

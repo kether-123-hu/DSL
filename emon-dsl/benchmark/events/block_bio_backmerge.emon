@@ -1,0 +1,30 @@
+// ============================================================
+// Benchmark: events - block_bio_backmerge
+// Tests block bio backmerge event monitoring
+// ============================================================
+
+tool block_bio_backmerge_event {
+    option interval = 5s;
+}
+
+    observe tracepoint("block:block_bio_backmerge")
+measure count, latency
+{
+    @block_bio_backmerge_count[pid, comm] = count();
+    @block_bio_backmerge_avg[pid, comm]   = avg(latency);
+    @block_bio_backmerge_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== block bio backmerge events ===");
+    print(@block_bio_backmerge_count);
+    print(@block_bio_backmerge_avg);
+    print(@block_bio_backmerge_hist);
+}

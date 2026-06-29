@@ -1,0 +1,31 @@
+// ============================================================
+// Benchmark: system_calls - openat
+// Tests openat syscall monitoring with filtering
+// ============================================================
+
+tool openat_syscall {
+    option interval = 5s;
+    option target_pid = 0;
+}
+
+observe syscall("openat")
+where target_pid == 0 || pid == target_pid
+measure latency, retval
+{
+    @openat_count[pid, comm] = count();
+    @openat_avg[pid, comm]    = avg(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== openat syscall stats ===");
+    print(@openat_count);
+    print(@openat_avg);
+}

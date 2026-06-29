@@ -1,0 +1,30 @@
+// ============================================================
+// Benchmark: events - signal_generate
+// Tests signal generate event monitoring
+// ============================================================
+
+tool signal_generate_event {
+    option interval = 5s;
+}
+
+    observe tracepoint("signal:signal_generate")
+measure count, latency
+{
+    @signal_generate_count[pid, comm] = count();
+    @signal_generate_avg[pid, comm]   = avg(latency);
+    @signal_generate_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== signal generate events ===");
+    print(@signal_generate_count);
+    print(@signal_generate_avg);
+    print(@signal_generate_hist);
+}

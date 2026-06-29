@@ -1,0 +1,28 @@
+// ============================================================
+// Benchmark: functions - skb_put
+// Tests kernel function kprobe for skb put
+// ============================================================
+
+tool skb_put_func {
+    option interval = 5s;
+}
+
+observe kernel("skb_put")
+measure latency
+{
+    @skb_put_count[pid, comm] = count();
+    @skb_put_avg[pid, comm]   = avg(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== skb_put kernel function ===");
+    print(@skb_put_count);
+    print(@skb_put_avg);
+}

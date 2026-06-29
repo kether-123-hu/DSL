@@ -1,0 +1,30 @@
+// ============================================================
+// Benchmark: events - net_udp_recvmsg
+// Tests net udp recvmsg event monitoring
+// ============================================================
+
+tool net_udp_recvmsg_event {
+    option interval = 5s;
+}
+
+    observe net("udp_recvmsg")
+measure count, latency
+{
+    @net_udp_recvmsg_count[pid, comm] = count();
+    @net_udp_recvmsg_avg[pid, comm]   = avg(latency);
+    @net_udp_recvmsg_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== net udp recvmsg events ===");
+    print(@net_udp_recvmsg_count);
+    print(@net_udp_recvmsg_avg);
+    print(@net_udp_recvmsg_hist);
+}

@@ -1,0 +1,27 @@
+// ============================================================
+// Benchmark: data_structures - mount
+// Tests monitoring mount lifecycle operations
+// ============================================================
+
+tool mount_ds {
+    option interval = 5s;
+}
+
+observe syscall("mount", "umount2", "pivot_root")
+measure count, retval
+{
+    @mount_count[comm, syscall] = count();
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        syscall = syscall;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== mount stats ===");
+    print(@mount_count);
+}

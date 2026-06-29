@@ -1,0 +1,30 @@
+// ============================================================
+// Benchmark: events - sock_sendmsg
+// Tests sock sendmsg event monitoring
+// ============================================================
+
+tool sock_sendmsg_event {
+    option interval = 5s;
+}
+
+    observe tracepoint("sock:inet_sock_set_state")
+measure count, latency
+{
+    @sock_sendmsg_count[pid, comm] = count();
+    @sock_sendmsg_avg[pid, comm]   = avg(latency);
+    @sock_sendmsg_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== sock sendmsg events ===");
+    print(@sock_sendmsg_count);
+    print(@sock_sendmsg_avg);
+    print(@sock_sendmsg_hist);
+}

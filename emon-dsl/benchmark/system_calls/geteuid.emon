@@ -1,0 +1,31 @@
+// ============================================================
+// Benchmark: system_calls - geteuid
+// Tests geteuid syscall monitoring with latency and return value tracking
+// ============================================================
+
+tool geteuid_syscall {
+    option interval = 5s;
+}
+
+observe syscall("geteuid")
+measure latency, retval
+{
+    @geteuid_count[pid, comm] = count();
+    @geteuid_avg[pid, comm]   = avg(latency);
+    @geteuid_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== geteuid syscall stats ===");
+    print(@geteuid_count);
+    print(@geteuid_avg);
+    print(@geteuid_hist);
+}

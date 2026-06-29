@@ -1,0 +1,30 @@
+// ============================================================
+// Benchmark: events - task_rename
+// Tests task rename event monitoring
+// ============================================================
+
+tool task_rename_event {
+    option interval = 5s;
+}
+
+    observe tracepoint("task:task_rename")
+measure count, latency
+{
+    @task_rename_count[pid, comm] = count();
+    @task_rename_avg[pid, comm]   = avg(latency);
+    @task_rename_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== task rename events ===");
+    print(@task_rename_count);
+    print(@task_rename_avg);
+    print(@task_rename_hist);
+}

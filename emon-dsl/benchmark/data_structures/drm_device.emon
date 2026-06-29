@@ -1,0 +1,27 @@
+// ============================================================
+// Benchmark: data_structures - drm_device
+// Tests monitoring DRM device control operations
+// ============================================================
+
+tool drm_device_ds {
+    option interval = 5s;
+}
+
+observe syscall("open", "ioctl", "close")
+measure count, retval
+{
+    @drm_device_count[comm, syscall] = count();
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        syscall = syscall;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== drm_device stats ===");
+    print(@drm_device_count);
+}

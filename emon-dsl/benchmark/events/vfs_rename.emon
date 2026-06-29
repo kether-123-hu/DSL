@@ -1,0 +1,30 @@
+// ============================================================
+// Benchmark: events - vfs_rename
+// Tests vfs rename event monitoring
+// ============================================================
+
+tool vfs_rename_event {
+    option interval = 5s;
+}
+
+    observe file("vfs_rename", "do_rename")
+measure count, latency
+{
+    @vfs_rename_count[pid, comm] = count();
+    @vfs_rename_avg[pid, comm]   = avg(latency);
+    @vfs_rename_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== vfs rename events ===");
+    print(@vfs_rename_count);
+    print(@vfs_rename_avg);
+    print(@vfs_rename_hist);
+}

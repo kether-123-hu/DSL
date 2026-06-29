@@ -1,0 +1,30 @@
+// ============================================================
+// Benchmark: events - vfs_mkdir
+// Tests vfs mkdir event monitoring
+// ============================================================
+
+tool vfs_mkdir_event {
+    option interval = 5s;
+}
+
+    observe file("vfs_mkdir", "do_mkdir")
+measure count, latency
+{
+    @vfs_mkdir_count[pid, comm] = count();
+    @vfs_mkdir_avg[pid, comm]   = avg(latency);
+    @vfs_mkdir_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== vfs mkdir events ===");
+    print(@vfs_mkdir_count);
+    print(@vfs_mkdir_avg);
+    print(@vfs_mkdir_hist);
+}

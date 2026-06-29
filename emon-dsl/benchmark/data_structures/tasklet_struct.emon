@@ -1,0 +1,27 @@
+// ============================================================
+// Benchmark: data_structures - tasklet_struct
+// Tests monitoring tasklet-like event handling
+// ============================================================
+
+tool tasklet_struct_ds {
+    option interval = 5s;
+}
+
+observe syscall("signalfd", "epoll_wait", "select")
+measure count, retval
+{
+    @tasklet_struct_count[comm, syscall] = count();
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        syscall = syscall;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== tasklet_struct stats ===");
+    print(@tasklet_struct_count);
+}

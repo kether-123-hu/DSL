@@ -1,0 +1,31 @@
+// ============================================================
+// Benchmark: system_calls - read
+// Tests basic read syscall monitoring with latency tracking
+// ============================================================
+
+tool read_syscall {
+    option interval = 5s;
+}
+
+observe syscall("read")
+measure latency, retval
+{
+    @read_count[pid, comm] = count();
+    @read_avg[pid, comm]   = avg(latency);
+    @read_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== read syscall stats ===");
+    print(@read_count);
+    print(@read_avg);
+    print(@read_hist);
+}

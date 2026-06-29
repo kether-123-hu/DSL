@@ -1,0 +1,31 @@
+// ============================================================
+// Benchmark: system_calls - arch_prctl
+// Tests arch_prctl syscall monitoring with latency and return value tracking
+// ============================================================
+
+tool arch_prctl_syscall {
+    option interval = 5s;
+}
+
+observe syscall("arch_prctl")
+measure latency, retval
+{
+    @arch_prctl_count[pid, comm] = count();
+    @arch_prctl_avg[pid, comm]   = avg(latency);
+    @arch_prctl_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== arch prctl syscall stats ===");
+    print(@arch_prctl_count);
+    print(@arch_prctl_avg);
+    print(@arch_prctl_hist);
+}

@@ -1,0 +1,29 @@
+// ============================================================
+// Benchmark: events - sched_switch
+// Tests scheduler context switch event monitoring
+// ============================================================
+
+tool sched_switch_event {
+    option interval = 5s;
+}
+
+observe sched("sched_switch")
+measure count, latency
+{
+    @switch_count[cpu, comm] = count();
+    @switch_min[cpu]         = min(latency);
+    @switch_max[cpu]         = max(latency);
+
+    emit {
+        time = nsecs;
+        cpu  = cpu;
+        comm = comm;
+    };
+}
+
+every interval {
+    print("=== sched_switch events ===");
+    print(@switch_count);
+    print(@switch_min);
+    print(@switch_max);
+}

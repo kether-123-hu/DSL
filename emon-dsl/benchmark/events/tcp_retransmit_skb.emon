@@ -1,0 +1,30 @@
+// ============================================================
+// Benchmark: events - tcp_retransmit_skb
+// Tests tcp retransmit skb event monitoring
+// ============================================================
+
+tool tcp_retransmit_skb_event {
+    option interval = 5s;
+}
+
+    observe tracepoint("tcp:tcp_retransmit_skb")
+measure count, latency
+{
+    @tcp_retransmit_skb_count[pid, comm] = count();
+    @tcp_retransmit_skb_avg[pid, comm]   = avg(latency);
+    @tcp_retransmit_skb_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== tcp retransmit skb events ===");
+    print(@tcp_retransmit_skb_count);
+    print(@tcp_retransmit_skb_avg);
+    print(@tcp_retransmit_skb_hist);
+}

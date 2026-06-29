@@ -1,0 +1,31 @@
+// ============================================================
+// Benchmark: system_calls - fchmod
+// Tests fchmod syscall monitoring with latency and return value tracking
+// ============================================================
+
+tool fchmod_syscall {
+    option interval = 5s;
+}
+
+observe syscall("fchmod")
+measure latency, retval
+{
+    @fchmod_count[pid, comm] = count();
+    @fchmod_avg[pid, comm]   = avg(latency);
+    @fchmod_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== fchmod syscall stats ===");
+    print(@fchmod_count);
+    print(@fchmod_avg);
+    print(@fchmod_hist);
+}

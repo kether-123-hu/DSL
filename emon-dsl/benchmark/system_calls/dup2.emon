@@ -1,0 +1,31 @@
+// ============================================================
+// Benchmark: system_calls - dup2
+// Tests dup2 syscall monitoring with latency and return value tracking
+// ============================================================
+
+tool dup2_syscall {
+    option interval = 5s;
+}
+
+observe syscall("dup2")
+measure latency, retval
+{
+    @dup2_count[pid, comm] = count();
+    @dup2_avg[pid, comm]   = avg(latency);
+    @dup2_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== dup2 syscall stats ===");
+    print(@dup2_count);
+    print(@dup2_avg);
+    print(@dup2_hist);
+}

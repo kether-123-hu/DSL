@@ -1,0 +1,30 @@
+// ============================================================
+// Benchmark: events - signal_deliver
+// Tests signal deliver event monitoring
+// ============================================================
+
+tool signal_deliver_event {
+    option interval = 5s;
+}
+
+    observe tracepoint("signal:signal_deliver")
+measure count, latency
+{
+    @signal_deliver_count[pid, comm] = count();
+    @signal_deliver_avg[pid, comm]   = avg(latency);
+    @signal_deliver_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== signal deliver events ===");
+    print(@signal_deliver_count);
+    print(@signal_deliver_avg);
+    print(@signal_deliver_hist);
+}

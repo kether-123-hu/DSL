@@ -1,0 +1,31 @@
+// ============================================================
+// Benchmark: system_calls - getppid
+// Tests getppid syscall monitoring with latency and return value tracking
+// ============================================================
+
+tool getppid_syscall {
+    option interval = 5s;
+}
+
+observe syscall("getppid")
+measure latency, retval
+{
+    @getppid_count[pid, comm] = count();
+    @getppid_avg[pid, comm]   = avg(latency);
+    @getppid_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== getppid syscall stats ===");
+    print(@getppid_count);
+    print(@getppid_avg);
+    print(@getppid_hist);
+}

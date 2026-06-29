@@ -1,0 +1,29 @@
+// ============================================================
+// Benchmark: functions - copy_user
+// Tests kernel function kprobe for user-kernel data copy
+// ============================================================
+
+tool copy_user_func {
+    option interval = 5s;
+}
+
+observe kernel("copy_from_user", "copy_to_user", "__copy_from_user", "__copy_to_user")
+measure latency
+{
+    @copy_count[func, pid, comm] = count();
+    @copy_avg[func, pid, comm]   = avg(latency);
+
+    emit {
+        time    = nsecs;
+        func    = func;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== copy_user kernel functions ===");
+    print(@copy_count);
+    print(@copy_avg);
+}

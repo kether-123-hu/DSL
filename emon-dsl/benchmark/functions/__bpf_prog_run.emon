@@ -1,0 +1,28 @@
+// ============================================================
+// Benchmark: functions - __bpf_prog_run
+// Tests kernel function kprobe for   bpf prog run
+// ============================================================
+
+tool __bpf_prog_run_func {
+    option interval = 5s;
+}
+
+observe kernel("__bpf_prog_run")
+measure latency
+{
+    @__bpf_prog_run_count[pid, comm] = count();
+    @__bpf_prog_run_avg[pid, comm]   = avg(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== __bpf_prog_run kernel function ===");
+    print(@__bpf_prog_run_count);
+    print(@__bpf_prog_run_avg);
+}

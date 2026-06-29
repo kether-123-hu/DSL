@@ -1,0 +1,30 @@
+// ============================================================
+// Benchmark: events - netif_receive_skb
+// Tests netif receive skb event monitoring
+// ============================================================
+
+tool netif_receive_skb_event {
+    option interval = 5s;
+}
+
+    observe tracepoint("net:netif_receive_skb")
+measure count, latency
+{
+    @netif_receive_skb_count[pid, comm] = count();
+    @netif_receive_skb_avg[pid, comm]   = avg(latency);
+    @netif_receive_skb_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== netif receive skb events ===");
+    print(@netif_receive_skb_count);
+    print(@netif_receive_skb_avg);
+    print(@netif_receive_skb_hist);
+}

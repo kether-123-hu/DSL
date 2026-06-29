@@ -1,0 +1,30 @@
+// ============================================================
+// Benchmark: events - proc_exec
+// Tests proc exec event monitoring
+// ============================================================
+
+tool proc_exec_event {
+    option interval = 5s;
+}
+
+    observe tracepoint("sched:sched_process_exec")
+measure count, latency
+{
+    @proc_exec_count[pid, comm] = count();
+    @proc_exec_avg[pid, comm]   = avg(latency);
+    @proc_exec_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== proc exec events ===");
+    print(@proc_exec_count);
+    print(@proc_exec_avg);
+    print(@proc_exec_hist);
+}

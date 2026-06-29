@@ -1,0 +1,28 @@
+// ============================================================
+// Benchmark: functions - submit_bio
+// Tests kernel function kprobe for submit bio
+// ============================================================
+
+tool submit_bio_func {
+    option interval = 5s;
+}
+
+observe kernel("submit_bio")
+measure latency
+{
+    @submit_bio_count[pid, comm] = count();
+    @submit_bio_avg[pid, comm]   = avg(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== submit_bio kernel function ===");
+    print(@submit_bio_count);
+    print(@submit_bio_avg);
+}

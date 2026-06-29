@@ -1,0 +1,27 @@
+// ============================================================
+// Benchmark: data_structures - inode
+// Tests monitoring inode metadata access
+// ============================================================
+
+tool inode_ds {
+    option interval = 5s;
+}
+
+observe syscall("open", "stat", "fstat")
+measure count, retval
+{
+    @inode_count[comm, syscall] = count();
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        syscall = syscall;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== inode stats ===");
+    print(@inode_count);
+}

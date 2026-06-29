@@ -1,0 +1,30 @@
+// ============================================================
+// Benchmark: events - vfs_rmdir
+// Tests vfs rmdir event monitoring
+// ============================================================
+
+tool vfs_rmdir_event {
+    option interval = 5s;
+}
+
+    observe file("vfs_rmdir", "do_rmdir")
+measure count, latency
+{
+    @vfs_rmdir_count[pid, comm] = count();
+    @vfs_rmdir_avg[pid, comm]   = avg(latency);
+    @vfs_rmdir_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== vfs rmdir events ===");
+    print(@vfs_rmdir_count);
+    print(@vfs_rmdir_avg);
+    print(@vfs_rmdir_hist);
+}

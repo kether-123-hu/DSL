@@ -1,0 +1,27 @@
+// ============================================================
+// Benchmark: data_structures - sk_buff
+// Tests monitoring socket buffer packet operations
+// ============================================================
+
+tool sk_buff_ds {
+    option interval = 5s;
+}
+
+observe syscall("sendto", "recvfrom", "sendmsg")
+measure count, retval
+{
+    @sk_buff_count[comm, syscall] = count();
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        syscall = syscall;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== sk_buff stats ===");
+    print(@sk_buff_count);
+}

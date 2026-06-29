@@ -1,0 +1,28 @@
+// ============================================================
+// Benchmark: functions - schedule_timeout
+// Tests kernel function kprobe for schedule timeout
+// ============================================================
+
+tool schedule_timeout_func {
+    option interval = 5s;
+}
+
+observe kernel("schedule_timeout")
+measure latency
+{
+    @schedule_timeout_count[pid, comm] = count();
+    @schedule_timeout_avg[pid, comm]   = avg(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== schedule_timeout kernel function ===");
+    print(@schedule_timeout_count);
+    print(@schedule_timeout_avg);
+}

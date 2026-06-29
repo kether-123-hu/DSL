@@ -1,0 +1,27 @@
+// ============================================================
+// Benchmark: data_structures - tty_struct
+// Tests monitoring TTY device control operations
+// ============================================================
+
+tool tty_struct_ds {
+    option interval = 5s;
+}
+
+observe syscall("open", "tcgetattr", "tcsetattr")
+measure count, retval
+{
+    @tty_struct_count[comm, syscall] = count();
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        syscall = syscall;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== tty_struct stats ===");
+    print(@tty_struct_count);
+}

@@ -1,0 +1,28 @@
+// ============================================================
+// Benchmark: functions - __filemap_fdatawrite_range
+// Tests kernel function kprobe for   filemap fdatawrite range
+// ============================================================
+
+tool __filemap_fdatawrite_range_func {
+    option interval = 5s;
+}
+
+observe kernel("__filemap_fdatawrite_range")
+measure latency
+{
+    @__filemap_fdatawrite_range_count[pid, comm] = count();
+    @__filemap_fdatawrite_range_avg[pid, comm]   = avg(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== __filemap_fdatawrite_range kernel function ===");
+    print(@__filemap_fdatawrite_range_count);
+    print(@__filemap_fdatawrite_range_avg);
+}

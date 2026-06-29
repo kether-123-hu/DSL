@@ -1,0 +1,31 @@
+// ============================================================
+// Benchmark: system_calls - getresuid
+// Tests getresuid syscall monitoring with latency and return value tracking
+// ============================================================
+
+tool getresuid_syscall {
+    option interval = 5s;
+}
+
+observe syscall("getresuid")
+measure latency, retval
+{
+    @getresuid_count[pid, comm] = count();
+    @getresuid_avg[pid, comm]   = avg(latency);
+    @getresuid_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== getresuid syscall stats ===");
+    print(@getresuid_count);
+    print(@getresuid_avg);
+    print(@getresuid_hist);
+}

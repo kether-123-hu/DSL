@@ -1,0 +1,30 @@
+// ============================================================
+// Benchmark: events - proc_exit
+// Tests proc exit event monitoring
+// ============================================================
+
+tool proc_exit_event {
+    option interval = 5s;
+}
+
+    observe tracepoint("sched:sched_process_exit")
+measure count, latency
+{
+    @proc_exit_count[pid, comm] = count();
+    @proc_exit_avg[pid, comm]   = avg(latency);
+    @proc_exit_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== proc exit events ===");
+    print(@proc_exit_count);
+    print(@proc_exit_avg);
+    print(@proc_exit_hist);
+}

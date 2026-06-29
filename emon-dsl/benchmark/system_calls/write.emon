@@ -1,0 +1,31 @@
+// ============================================================
+// Benchmark: system_calls - write
+// Tests write syscall monitoring with aggregation
+// ============================================================
+
+tool write_syscall {
+    option interval = 5s;
+}
+
+observe syscall("write")
+measure latency, retval
+{
+    @write_count[pid, comm] = count();
+    @write_avg[pid, comm]   = avg(latency);
+    @write_sum[comm]        = sum(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== write syscall stats ===");
+    print(@write_count);
+    print(@write_avg);
+    print(@write_sum);
+}

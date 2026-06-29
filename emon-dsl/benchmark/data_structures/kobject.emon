@@ -1,0 +1,27 @@
+// ============================================================
+// Benchmark: data_structures - kobject
+// Tests monitoring kernel object control operations
+// ============================================================
+
+tool kobject_ds {
+    option interval = 5s;
+}
+
+observe syscall("ioctl", "open", "close")
+measure count, retval
+{
+    @kobject_count[comm, syscall] = count();
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        syscall = syscall;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== kobject stats ===");
+    print(@kobject_count);
+}

@@ -1,0 +1,30 @@
+// ============================================================
+// Benchmark: events - sock_recvmsg
+// Tests sock recvmsg event monitoring
+// ============================================================
+
+tool sock_recvmsg_event {
+    option interval = 5s;
+}
+
+    observe tracepoint("sock:inet_sock_set_state")
+measure count, latency
+{
+    @sock_recvmsg_count[pid, comm] = count();
+    @sock_recvmsg_avg[pid, comm]   = avg(latency);
+    @sock_recvmsg_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== sock recvmsg events ===");
+    print(@sock_recvmsg_count);
+    print(@sock_recvmsg_avg);
+    print(@sock_recvmsg_hist);
+}

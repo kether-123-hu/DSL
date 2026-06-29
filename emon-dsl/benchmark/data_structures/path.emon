@@ -1,0 +1,27 @@
+// ============================================================
+// Benchmark: data_structures - path
+// Tests monitoring path manipulation operations
+// ============================================================
+
+tool path_ds {
+    option interval = 5s;
+}
+
+observe syscall("open", "rename", "link")
+measure count, retval
+{
+    @path_count[comm, syscall] = count();
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        syscall = syscall;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== path stats ===");
+    print(@path_count);
+}

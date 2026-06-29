@@ -1,0 +1,30 @@
+// ============================================================
+// Benchmark: events - arp_in
+// Tests arp in event monitoring
+// ============================================================
+
+tool arp_in_event {
+    option interval = 5s;
+}
+
+    observe tracepoint("arp:arp_in")
+measure count, latency
+{
+    @arp_in_count[pid, comm] = count();
+    @arp_in_avg[pid, comm]   = avg(latency);
+    @arp_in_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== arp in events ===");
+    print(@arp_in_count);
+    print(@arp_in_avg);
+    print(@arp_in_hist);
+}

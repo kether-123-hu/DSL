@@ -1,0 +1,30 @@
+// ============================================================
+// Benchmark: events - block_rq_requeue
+// Tests block rq requeue event monitoring
+// ============================================================
+
+tool block_rq_requeue_event {
+    option interval = 5s;
+}
+
+    observe tracepoint("block:block_rq_requeue")
+measure count, latency
+{
+    @block_rq_requeue_count[pid, comm] = count();
+    @block_rq_requeue_avg[pid, comm]   = avg(latency);
+    @block_rq_requeue_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== block rq requeue events ===");
+    print(@block_rq_requeue_count);
+    print(@block_rq_requeue_avg);
+    print(@block_rq_requeue_hist);
+}

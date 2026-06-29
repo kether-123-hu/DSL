@@ -1,0 +1,29 @@
+// ============================================================
+// Benchmark: functions - alloc_pages
+// Tests kernel function kprobe for memory allocation
+// ============================================================
+
+tool alloc_pages_func {
+    option interval = 5s;
+}
+
+observe kernel("__alloc_pages_nodemask", "alloc_pages", "__get_free_pages")
+measure latency
+{
+    @alloc_count[func, pid, comm] = count();
+    @alloc_avg[func, pid, comm]   = avg(latency);
+
+    emit {
+        time    = nsecs;
+        func    = func;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== alloc_pages kernel functions ===");
+    print(@alloc_count);
+    print(@alloc_avg);
+}

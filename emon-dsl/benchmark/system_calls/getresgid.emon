@@ -1,0 +1,31 @@
+// ============================================================
+// Benchmark: system_calls - getresgid
+// Tests getresgid syscall monitoring with latency and return value tracking
+// ============================================================
+
+tool getresgid_syscall {
+    option interval = 5s;
+}
+
+observe syscall("getresgid")
+measure latency, retval
+{
+    @getresgid_count[pid, comm] = count();
+    @getresgid_avg[pid, comm]   = avg(latency);
+    @getresgid_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== getresgid syscall stats ===");
+    print(@getresgid_count);
+    print(@getresgid_avg);
+    print(@getresgid_hist);
+}

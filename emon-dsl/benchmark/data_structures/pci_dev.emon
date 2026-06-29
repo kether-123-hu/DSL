@@ -1,0 +1,27 @@
+// ============================================================
+// Benchmark: data_structures - pci_dev
+// Tests monitoring PCI device control operations
+// ============================================================
+
+tool pci_dev_ds {
+    option interval = 5s;
+}
+
+observe syscall("open", "ioctl", "close")
+measure count, retval
+{
+    @pci_dev_count[comm, syscall] = count();
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        syscall = syscall;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== pci_dev stats ===");
+    print(@pci_dev_count);
+}

@@ -1,0 +1,29 @@
+// ============================================================
+// Benchmark: functions - kmalloc
+// Tests kernel function kprobe for slab allocations
+// ============================================================
+
+tool kmalloc_func {
+    option interval = 5s;
+}
+
+observe kernel("kmalloc", "kmalloc_node", "__kmalloc", "kfree")
+measure latency
+{
+    @kmalloc_count[func, pid, comm] = count();
+    @kmalloc_avg[func, pid, comm]   = avg(latency);
+
+    emit {
+        time    = nsecs;
+        func    = func;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== kmalloc kernel functions ===");
+    print(@kmalloc_count);
+    print(@kmalloc_avg);
+}

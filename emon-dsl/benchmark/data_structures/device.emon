@@ -1,0 +1,27 @@
+// ============================================================
+// Benchmark: data_structures - device
+// Tests monitoring device object management
+// ============================================================
+
+tool device_ds {
+    option interval = 5s;
+}
+
+observe syscall("ioctl", "open", "close")
+measure count, retval
+{
+    @device_count[comm, syscall] = count();
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        syscall = syscall;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== device stats ===");
+    print(@device_count);
+}

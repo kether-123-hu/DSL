@@ -1,0 +1,28 @@
+// ============================================================
+// Benchmark: functions - tcp_sendmsg
+// Tests kernel function kprobe for tcp sendmsg
+// ============================================================
+
+tool tcp_sendmsg_func {
+    option interval = 5s;
+}
+
+observe kernel("tcp_sendmsg")
+measure latency
+{
+    @tcp_sendmsg_count[pid, comm] = count();
+    @tcp_sendmsg_avg[pid, comm]   = avg(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== tcp_sendmsg kernel function ===");
+    print(@tcp_sendmsg_count);
+    print(@tcp_sendmsg_avg);
+}

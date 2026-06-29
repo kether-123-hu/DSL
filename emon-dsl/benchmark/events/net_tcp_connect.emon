@@ -1,0 +1,30 @@
+// ============================================================
+// Benchmark: events - net_tcp_connect
+// Tests net tcp connect event monitoring
+// ============================================================
+
+tool net_tcp_connect_event {
+    option interval = 5s;
+}
+
+    observe net("tcp_connect")
+measure count, latency
+{
+    @net_tcp_connect_count[pid, comm] = count();
+    @net_tcp_connect_avg[pid, comm]   = avg(latency);
+    @net_tcp_connect_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== net tcp connect events ===");
+    print(@net_tcp_connect_count);
+    print(@net_tcp_connect_avg);
+    print(@net_tcp_connect_hist);
+}

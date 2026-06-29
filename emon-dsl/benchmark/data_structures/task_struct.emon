@@ -1,0 +1,28 @@
+// ============================================================
+// Benchmark: data_structures - task_struct
+// Tests monitoring process task_struct via getpid family
+// ============================================================
+
+tool task_struct_ds {
+    option interval = 5s;
+}
+
+observe syscall("getpid", "gettid", "getppid")
+measure count, retval
+{
+    @pid_count[comm, syscall] = count();
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        tid     = tid;
+        comm    = comm;
+        syscall = syscall;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== task_struct (PID) stats ===");
+    print(@pid_count);
+}

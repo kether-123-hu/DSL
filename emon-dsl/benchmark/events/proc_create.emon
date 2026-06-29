@@ -1,0 +1,25 @@
+// ============================================================
+// Benchmark: events - proc_create
+// Tests process creation event monitoring
+// ============================================================
+
+tool proc_create_event {
+    option interval = 5s;
+}
+
+observe tracepoint("sched:sched_process_exec", "sched:sched_process_fork")
+measure count
+{
+    @proc_count[comm] = count();
+
+    emit {
+        time = nsecs;
+        comm = comm;
+        pid  = pid;
+    };
+}
+
+every interval {
+    print("=== process creation events ===");
+    print(@proc_count);
+}

@@ -1,0 +1,27 @@
+// ============================================================
+// Benchmark: data_structures - quota
+// Tests monitoring quota management operations
+// ============================================================
+
+tool quota_ds {
+    option interval = 5s;
+}
+
+observe syscall("quotactl", "open", "close")
+measure count, retval
+{
+    @quota_count[comm, syscall] = count();
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        syscall = syscall;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== quota stats ===");
+    print(@quota_count);
+}

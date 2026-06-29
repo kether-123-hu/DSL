@@ -1,0 +1,27 @@
+// ============================================================
+// Benchmark: data_structures - super_block
+// Tests monitoring super block filesystem operations
+// ============================================================
+
+tool super_block_ds {
+    option interval = 5s;
+}
+
+observe syscall("mount", "umount2", "statfs")
+measure count, retval
+{
+    @super_block_count[comm, syscall] = count();
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        syscall = syscall;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== super_block stats ===");
+    print(@super_block_count);
+}

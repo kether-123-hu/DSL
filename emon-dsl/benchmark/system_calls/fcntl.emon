@@ -1,0 +1,31 @@
+// ============================================================
+// Benchmark: system_calls - fcntl
+// Tests fcntl syscall monitoring with latency and return value tracking
+// ============================================================
+
+tool fcntl_syscall {
+    option interval = 5s;
+}
+
+observe syscall("fcntl")
+measure latency, retval
+{
+    @fcntl_count[pid, comm] = count();
+    @fcntl_avg[pid, comm]   = avg(latency);
+    @fcntl_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== fcntl syscall stats ===");
+    print(@fcntl_count);
+    print(@fcntl_avg);
+    print(@fcntl_hist);
+}

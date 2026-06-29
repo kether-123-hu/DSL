@@ -1,0 +1,31 @@
+// ============================================================
+// Benchmark: system_calls - fstat
+// Tests fstat syscall monitoring with latency and return value tracking
+// ============================================================
+
+tool fstat_syscall {
+    option interval = 5s;
+}
+
+observe syscall("fstat")
+measure latency, retval
+{
+    @fstat_count[pid, comm] = count();
+    @fstat_avg[pid, comm]   = avg(latency);
+    @fstat_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== fstat syscall stats ===");
+    print(@fstat_count);
+    print(@fstat_avg);
+    print(@fstat_hist);
+}

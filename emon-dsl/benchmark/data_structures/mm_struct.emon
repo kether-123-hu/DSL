@@ -1,0 +1,27 @@
+// ============================================================
+// Benchmark: data_structures - mm_struct
+// Tests monitoring memory manager statistics
+// ============================================================
+
+tool mm_struct_ds {
+    option interval = 5s;
+}
+
+observe syscall("mmap", "mprotect", "munmap")
+measure count, retval
+{
+    @mm_struct_count[comm, syscall] = count();
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        syscall = syscall;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== mm_struct stats ===");
+    print(@mm_struct_count);
+}

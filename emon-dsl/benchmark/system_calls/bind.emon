@@ -1,0 +1,31 @@
+// ============================================================
+// Benchmark: system_calls - bind
+// Tests bind syscall monitoring with latency and return value tracking
+// ============================================================
+
+tool bind_syscall {
+    option interval = 5s;
+}
+
+observe syscall("bind")
+measure latency, retval
+{
+    @bind_count[pid, comm] = count();
+    @bind_avg[pid, comm]   = avg(latency);
+    @bind_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== bind syscall stats ===");
+    print(@bind_count);
+    print(@bind_avg);
+    print(@bind_hist);
+}

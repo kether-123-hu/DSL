@@ -1,0 +1,31 @@
+// ============================================================
+// Benchmark: system_calls - clock_gettime
+// Tests clock_gettime syscall monitoring with latency and return value tracking
+// ============================================================
+
+tool clock_gettime_syscall {
+    option interval = 5s;
+}
+
+observe syscall("clock_gettime")
+measure latency, retval
+{
+    @clock_gettime_count[pid, comm] = count();
+    @clock_gettime_avg[pid, comm]   = avg(latency);
+    @clock_gettime_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== clock gettime syscall stats ===");
+    print(@clock_gettime_count);
+    print(@clock_gettime_avg);
+    print(@clock_gettime_hist);
+}

@@ -1,0 +1,30 @@
+// ============================================================
+// Benchmark: events - kprobe_do_sys_open
+// Tests kprobe do sys open event monitoring
+// ============================================================
+
+tool kprobe_do_sys_open_event {
+    option interval = 5s;
+}
+
+    observe kernel("do_sys_open")
+measure count, latency
+{
+    @kprobe_do_sys_open_count[pid, comm] = count();
+    @kprobe_do_sys_open_avg[pid, comm]   = avg(latency);
+    @kprobe_do_sys_open_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== kprobe do sys open events ===");
+    print(@kprobe_do_sys_open_count);
+    print(@kprobe_do_sys_open_avg);
+    print(@kprobe_do_sys_open_hist);
+}

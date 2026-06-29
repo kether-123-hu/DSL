@@ -1,0 +1,28 @@
+// ============================================================
+// Benchmark: functions - bpf_map_create
+// Tests kernel function kprobe for bpf map create
+// ============================================================
+
+tool bpf_map_create_func {
+    option interval = 5s;
+}
+
+observe kernel("bpf_map_create")
+measure latency
+{
+    @bpf_map_create_count[pid, comm] = count();
+    @bpf_map_create_avg[pid, comm]   = avg(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== bpf_map_create kernel function ===");
+    print(@bpf_map_create_count);
+    print(@bpf_map_create_avg);
+}

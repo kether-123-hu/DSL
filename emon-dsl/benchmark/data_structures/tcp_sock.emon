@@ -1,0 +1,27 @@
+// ============================================================
+// Benchmark: data_structures - tcp_sock
+// Tests monitoring TCP socket traffic
+// ============================================================
+
+tool tcp_sock_ds {
+    option interval = 5s;
+}
+
+observe syscall("socket", "connect", "sendto")
+measure count, retval
+{
+    @tcp_sock_count[comm, syscall] = count();
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        syscall = syscall;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== tcp_sock stats ===");
+    print(@tcp_sock_count);
+}

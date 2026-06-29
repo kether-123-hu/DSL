@@ -1,0 +1,27 @@
+// ============================================================
+// Benchmark: data_structures - bpf_map
+// Tests monitoring BPF map operations
+// ============================================================
+
+tool bpf_map_ds {
+    option interval = 5s;
+}
+
+observe syscall("bpf", "read", "write")
+measure count, retval
+{
+    @bpf_map_count[comm, syscall] = count();
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        syscall = syscall;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== bpf_map stats ===");
+    print(@bpf_map_count);
+}

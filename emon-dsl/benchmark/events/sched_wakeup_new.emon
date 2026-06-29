@@ -1,0 +1,30 @@
+// ============================================================
+// Benchmark: events - sched_wakeup_new
+// Tests sched wakeup new event monitoring
+// ============================================================
+
+tool sched_wakeup_new_event {
+    option interval = 5s;
+}
+
+    observe tracepoint("sched:sched_wakeup_new")
+measure count, latency
+{
+    @sched_wakeup_new_count[pid, comm] = count();
+    @sched_wakeup_new_avg[pid, comm]   = avg(latency);
+    @sched_wakeup_new_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== sched wakeup new events ===");
+    print(@sched_wakeup_new_count);
+    print(@sched_wakeup_new_avg);
+    print(@sched_wakeup_new_hist);
+}

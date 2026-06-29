@@ -1,0 +1,27 @@
+// ============================================================
+// Benchmark: data_structures - files_struct
+// Tests monitoring file descriptors via close/dup syscalls
+// ============================================================
+
+tool files_struct_ds {
+    option interval = 5s;
+}
+
+observe syscall("close", "dup", "dup2", "dup3")
+measure count, retval
+{
+    @fd_count[comm, syscall] = count();
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        syscall = syscall;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== files_struct (FD) stats ===");
+    print(@fd_count);
+}

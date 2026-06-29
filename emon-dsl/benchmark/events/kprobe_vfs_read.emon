@@ -1,0 +1,30 @@
+// ============================================================
+// Benchmark: events - kprobe_vfs_read
+// Tests kprobe vfs read event monitoring
+// ============================================================
+
+tool kprobe_vfs_read_event {
+    option interval = 5s;
+}
+
+    observe kernel("vfs_read")
+measure count, latency
+{
+    @kprobe_vfs_read_count[pid, comm] = count();
+    @kprobe_vfs_read_avg[pid, comm]   = avg(latency);
+    @kprobe_vfs_read_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== kprobe vfs read events ===");
+    print(@kprobe_vfs_read_count);
+    print(@kprobe_vfs_read_avg);
+    print(@kprobe_vfs_read_hist);
+}

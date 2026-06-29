@@ -1,0 +1,30 @@
+// ============================================================
+// Benchmark: events - sock_create
+// Tests sock create event monitoring
+// ============================================================
+
+tool sock_create_event {
+    option interval = 5s;
+}
+
+    observe tracepoint("sock:inet_sock_set_state")
+measure count, latency
+{
+    @sock_create_count[pid, comm] = count();
+    @sock_create_avg[pid, comm]   = avg(latency);
+    @sock_create_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== sock create events ===");
+    print(@sock_create_count);
+    print(@sock_create_avg);
+    print(@sock_create_hist);
+}

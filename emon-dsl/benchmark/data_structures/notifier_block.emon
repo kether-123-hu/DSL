@@ -1,0 +1,27 @@
+// ============================================================
+// Benchmark: data_structures - notifier_block
+// Tests monitoring notifier event handling
+// ============================================================
+
+tool notifier_block_ds {
+    option interval = 5s;
+}
+
+observe syscall("signalfd", "kill", "signal")
+measure count, retval
+{
+    @notifier_block_count[comm, syscall] = count();
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        syscall = syscall;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== notifier_block stats ===");
+    print(@notifier_block_count);
+}

@@ -1,0 +1,31 @@
+// ============================================================
+// Benchmark: system_calls - futex
+// Tests futex syscall monitoring with latency and return value tracking
+// ============================================================
+
+tool futex_syscall {
+    option interval = 5s;
+}
+
+observe syscall("futex")
+measure latency, retval
+{
+    @futex_count[pid, comm] = count();
+    @futex_avg[pid, comm]   = avg(latency);
+    @futex_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== futex syscall stats ===");
+    print(@futex_count);
+    print(@futex_avg);
+    print(@futex_hist);
+}

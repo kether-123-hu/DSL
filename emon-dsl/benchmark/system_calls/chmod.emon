@@ -1,0 +1,31 @@
+// ============================================================
+// Benchmark: system_calls - chmod
+// Tests chmod syscall monitoring with latency and return value tracking
+// ============================================================
+
+tool chmod_syscall {
+    option interval = 5s;
+}
+
+observe syscall("chmod")
+measure latency, retval
+{
+    @chmod_count[pid, comm] = count();
+    @chmod_avg[pid, comm]   = avg(latency);
+    @chmod_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== chmod syscall stats ===");
+    print(@chmod_count);
+    print(@chmod_avg);
+    print(@chmod_hist);
+}

@@ -1,0 +1,30 @@
+// ============================================================
+// Benchmark: events - vfs_link
+// Tests vfs link event monitoring
+// ============================================================
+
+tool vfs_link_event {
+    option interval = 5s;
+}
+
+    observe file("vfs_link", "do_link")
+measure count, latency
+{
+    @vfs_link_count[pid, comm] = count();
+    @vfs_link_avg[pid, comm]   = avg(latency);
+    @vfs_link_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== vfs link events ===");
+    print(@vfs_link_count);
+    print(@vfs_link_avg);
+    print(@vfs_link_hist);
+}

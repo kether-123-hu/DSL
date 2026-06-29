@@ -1,0 +1,28 @@
+// ============================================================
+// Benchmark: functions - blk_mq_queue_rq
+// Tests kernel function kprobe for blk mq queue rq
+// ============================================================
+
+tool blk_mq_queue_rq_func {
+    option interval = 5s;
+}
+
+observe kernel("blk_mq_queue_rq")
+measure latency
+{
+    @blk_mq_queue_rq_count[pid, comm] = count();
+    @blk_mq_queue_rq_avg[pid, comm]   = avg(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== blk_mq_queue_rq kernel function ===");
+    print(@blk_mq_queue_rq_count);
+    print(@blk_mq_queue_rq_avg);
+}

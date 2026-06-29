@@ -1,0 +1,30 @@
+// ============================================================
+// Benchmark: events - block_rq_insert
+// Tests block rq insert event monitoring
+// ============================================================
+
+tool block_rq_insert_event {
+    option interval = 5s;
+}
+
+    observe tracepoint("block:block_rq_insert")
+measure count, latency
+{
+    @block_rq_insert_count[pid, comm] = count();
+    @block_rq_insert_avg[pid, comm]   = avg(latency);
+    @block_rq_insert_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== block rq insert events ===");
+    print(@block_rq_insert_count);
+    print(@block_rq_insert_avg);
+    print(@block_rq_insert_hist);
+}

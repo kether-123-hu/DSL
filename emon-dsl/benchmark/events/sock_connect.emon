@@ -1,0 +1,30 @@
+// ============================================================
+// Benchmark: events - sock_connect
+// Tests sock connect event monitoring
+// ============================================================
+
+tool sock_connect_event {
+    option interval = 5s;
+}
+
+    observe tracepoint("sock:inet_sock_set_state")
+measure count, latency
+{
+    @sock_connect_count[pid, comm] = count();
+    @sock_connect_avg[pid, comm]   = avg(latency);
+    @sock_connect_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== sock connect events ===");
+    print(@sock_connect_count);
+    print(@sock_connect_avg);
+    print(@sock_connect_hist);
+}

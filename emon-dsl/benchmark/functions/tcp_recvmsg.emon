@@ -1,0 +1,28 @@
+// ============================================================
+// Benchmark: functions - tcp_recvmsg
+// Tests kernel function kprobe for tcp recvmsg
+// ============================================================
+
+tool tcp_recvmsg_func {
+    option interval = 5s;
+}
+
+observe kernel("tcp_recvmsg")
+measure latency
+{
+    @tcp_recvmsg_count[pid, comm] = count();
+    @tcp_recvmsg_avg[pid, comm]   = avg(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== tcp_recvmsg kernel function ===");
+    print(@tcp_recvmsg_count);
+    print(@tcp_recvmsg_avg);
+}

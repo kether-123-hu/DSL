@@ -1,0 +1,28 @@
+// ============================================================
+// Benchmark: events - file_write
+// Tests file write event monitoring
+// ============================================================
+
+tool file_write_event {
+    option interval = 5s;
+}
+
+observe file("vfs_write", "generic_file_write_iter")
+measure latency
+{
+    @write_count[pid, comm] = count();
+    @write_avg[pid, comm]   = avg(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== file write events ===");
+    print(@write_count);
+    print(@write_avg);
+}

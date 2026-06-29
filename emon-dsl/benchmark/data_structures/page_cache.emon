@@ -1,0 +1,27 @@
+// ============================================================
+// Benchmark: data_structures - page_cache
+// Tests monitoring page cache write operations
+// ============================================================
+
+tool page_cache_ds {
+    option interval = 5s;
+}
+
+observe syscall("open", "write", "fsync")
+measure count, retval
+{
+    @page_cache_count[comm, syscall] = count();
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        syscall = syscall;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== page_cache stats ===");
+    print(@page_cache_count);
+}

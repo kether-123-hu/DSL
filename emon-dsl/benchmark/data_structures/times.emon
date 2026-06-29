@@ -1,0 +1,30 @@
+// ============================================================
+// Benchmark: data_structures - times
+// Tests monitoring process times via times syscall
+// ============================================================
+
+tool times_ds {
+    option interval = 5s;
+}
+
+observe syscall("times", "clock_gettime", "gettimeofday")
+measure latency, retval
+{
+    @times_count[comm, syscall] = count();
+    @times_avg[comm, syscall]  = avg(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        syscall = syscall;
+        latency = latency;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== times (process times) stats ===");
+    print(@times_count);
+    print(@times_avg);
+}

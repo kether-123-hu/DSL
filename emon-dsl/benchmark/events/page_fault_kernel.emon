@@ -1,0 +1,30 @@
+// ============================================================
+// Benchmark: events - page_fault_kernel
+// Tests page fault kernel event monitoring
+// ============================================================
+
+tool page_fault_kernel_event {
+    option interval = 5s;
+}
+
+    observe tracepoint("exceptions:page_fault_kernel")
+measure count, latency
+{
+    @page_fault_kernel_count[pid, comm] = count();
+    @page_fault_kernel_avg[pid, comm]   = avg(latency);
+    @page_fault_kernel_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== page fault kernel events ===");
+    print(@page_fault_kernel_count);
+    print(@page_fault_kernel_avg);
+    print(@page_fault_kernel_hist);
+}

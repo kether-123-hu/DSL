@@ -1,0 +1,30 @@
+// ============================================================
+// Benchmark: events - block_rq_remap
+// Tests block rq remap event monitoring
+// ============================================================
+
+tool block_rq_remap_event {
+    option interval = 5s;
+}
+
+    observe tracepoint("block:block_rq_remap")
+measure count, latency
+{
+    @block_rq_remap_count[pid, comm] = count();
+    @block_rq_remap_avg[pid, comm]   = avg(latency);
+    @block_rq_remap_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== block rq remap events ===");
+    print(@block_rq_remap_count);
+    print(@block_rq_remap_avg);
+    print(@block_rq_remap_hist);
+}

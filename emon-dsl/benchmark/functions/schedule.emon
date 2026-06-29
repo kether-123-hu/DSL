@@ -1,0 +1,29 @@
+// ============================================================
+// Benchmark: functions - schedule
+// Tests kernel function kprobe for scheduler operations
+// ============================================================
+
+tool schedule_func {
+    option interval = 5s;
+}
+
+observe kernel("__schedule", "schedule", "schedule_preempt_disabled")
+measure latency
+{
+    @sched_count[func, cpu] = count();
+    @sched_avg[func, cpu]  = avg(latency);
+
+    emit {
+        time    = nsecs;
+        func    = func;
+        cpu     = cpu;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== schedule kernel functions ===");
+    print(@sched_count);
+    print(@sched_avg);
+}

@@ -1,0 +1,30 @@
+// ============================================================
+// Benchmark: events - ip_rcv
+// Tests ip rcv event monitoring
+// ============================================================
+
+tool ip_rcv_event {
+    option interval = 5s;
+}
+
+    observe tracepoint("ip:ip_rcv")
+measure count, latency
+{
+    @ip_rcv_count[pid, comm] = count();
+    @ip_rcv_avg[pid, comm]   = avg(latency);
+    @ip_rcv_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== ip rcv events ===");
+    print(@ip_rcv_count);
+    print(@ip_rcv_avg);
+    print(@ip_rcv_hist);
+}

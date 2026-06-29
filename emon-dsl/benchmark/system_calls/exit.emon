@@ -1,0 +1,31 @@
+// ============================================================
+// Benchmark: system_calls - exit
+// Tests exit syscall monitoring with latency and return value tracking
+// ============================================================
+
+tool exit_syscall {
+    option interval = 5s;
+}
+
+observe syscall("exit")
+measure latency, retval
+{
+    @exit_count[pid, comm] = count();
+    @exit_avg[pid, comm]   = avg(latency);
+    @exit_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== exit syscall stats ===");
+    print(@exit_count);
+    print(@exit_avg);
+    print(@exit_hist);
+}

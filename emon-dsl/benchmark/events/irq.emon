@@ -1,0 +1,24 @@
+// ============================================================
+// Benchmark: events - irq
+// Tests interrupt request event monitoring
+// ============================================================
+
+tool irq_event {
+    option interval = 5s;
+}
+
+observe tracepoint("irq:irq_handler_entry", "irq:irq_handler_exit")
+measure count
+{
+    @irq_count[cpu] = count();
+
+    emit {
+        time = nsecs;
+        cpu  = cpu;
+    };
+}
+
+every interval {
+    print("=== IRQ events ===");
+    print(@irq_count);
+}

@@ -1,0 +1,28 @@
+// ============================================================
+// Benchmark: functions - __netif_receive_skb_core
+// Tests kernel function kprobe for   netif receive skb core
+// ============================================================
+
+tool __netif_receive_skb_core_func {
+    option interval = 5s;
+}
+
+observe kernel("__netif_receive_skb_core")
+measure latency
+{
+    @__netif_receive_skb_core_count[pid, comm] = count();
+    @__netif_receive_skb_core_avg[pid, comm]   = avg(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== __netif_receive_skb_core kernel function ===");
+    print(@__netif_receive_skb_core_count);
+    print(@__netif_receive_skb_core_avg);
+}

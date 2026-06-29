@@ -1,0 +1,30 @@
+// ============================================================
+// Benchmark: events - workqueue_execute_end
+// Tests workqueue execute end event monitoring
+// ============================================================
+
+tool workqueue_execute_end_event {
+    option interval = 5s;
+}
+
+    observe tracepoint("workqueue:workqueue_execute_end")
+measure count, latency
+{
+    @workqueue_execute_end_count[pid, comm] = count();
+    @workqueue_execute_end_avg[pid, comm]   = avg(latency);
+    @workqueue_execute_end_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== workqueue execute end events ===");
+    print(@workqueue_execute_end_count);
+    print(@workqueue_execute_end_avg);
+    print(@workqueue_execute_end_hist);
+}

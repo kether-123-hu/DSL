@@ -1,0 +1,27 @@
+// ============================================================
+// Benchmark: data_structures - net_namespace
+// Tests monitoring network namespace socket operations
+// ============================================================
+
+tool net_namespace_ds {
+    option interval = 5s;
+}
+
+observe syscall("socket", "bind", "connect")
+measure count, retval
+{
+    @net_namespace_count[comm, syscall] = count();
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        syscall = syscall;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== net_namespace stats ===");
+    print(@net_namespace_count);
+}

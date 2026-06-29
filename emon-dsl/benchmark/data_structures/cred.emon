@@ -1,0 +1,29 @@
+// ============================================================
+// Benchmark: data_structures - cred
+// Tests monitoring credentials via getuid/getgid syscalls
+// ============================================================
+
+tool cred_ds {
+    option interval = 5s;
+}
+
+observe syscall("getuid", "geteuid", "getgid", "getegid")
+measure count, retval
+{
+    @cred_count[comm, syscall] = count();
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        uid     = uid;
+        gid     = gid;
+        comm    = comm;
+        syscall = syscall;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== cred (credentials) stats ===");
+    print(@cred_count);
+}

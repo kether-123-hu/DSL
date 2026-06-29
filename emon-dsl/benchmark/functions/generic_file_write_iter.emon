@@ -1,0 +1,28 @@
+// ============================================================
+// Benchmark: functions - generic_file_write_iter
+// Tests kernel function kprobe for generic file write iter
+// ============================================================
+
+tool generic_file_write_iter_func {
+    option interval = 5s;
+}
+
+observe kernel("generic_file_write_iter")
+measure latency
+{
+    @generic_file_write_iter_count[pid, comm] = count();
+    @generic_file_write_iter_avg[pid, comm]   = avg(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== generic_file_write_iter kernel function ===");
+    print(@generic_file_write_iter_count);
+    print(@generic_file_write_iter_avg);
+}

@@ -1,0 +1,31 @@
+// ============================================================
+// Benchmark: system_calls - chown
+// Tests chown syscall monitoring with latency and return value tracking
+// ============================================================
+
+tool chown_syscall {
+    option interval = 5s;
+}
+
+observe syscall("chown")
+measure latency, retval
+{
+    @chown_count[pid, comm] = count();
+    @chown_avg[pid, comm]   = avg(latency);
+    @chown_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== chown syscall stats ===");
+    print(@chown_count);
+    print(@chown_avg);
+    print(@chown_hist);
+}

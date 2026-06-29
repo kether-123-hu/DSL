@@ -1,0 +1,28 @@
+// ============================================================
+// Benchmark: functions - bpf_map_lookup_elem
+// Tests kernel function kprobe for bpf map lookup elem
+// ============================================================
+
+tool bpf_map_lookup_elem_func {
+    option interval = 5s;
+}
+
+observe kernel("bpf_map_lookup_elem")
+measure latency
+{
+    @bpf_map_lookup_elem_count[pid, comm] = count();
+    @bpf_map_lookup_elem_avg[pid, comm]   = avg(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== bpf_map_lookup_elem kernel function ===");
+    print(@bpf_map_lookup_elem_count);
+    print(@bpf_map_lookup_elem_avg);
+}

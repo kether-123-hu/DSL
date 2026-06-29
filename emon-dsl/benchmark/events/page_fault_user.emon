@@ -1,0 +1,30 @@
+// ============================================================
+// Benchmark: events - page_fault_user
+// Tests page fault user event monitoring
+// ============================================================
+
+tool page_fault_user_event {
+    option interval = 5s;
+}
+
+    observe tracepoint("exceptions:page_fault_user")
+measure count, latency
+{
+    @page_fault_user_count[pid, comm] = count();
+    @page_fault_user_avg[pid, comm]   = avg(latency);
+    @page_fault_user_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== page fault user events ===");
+    print(@page_fault_user_count);
+    print(@page_fault_user_avg);
+    print(@page_fault_user_hist);
+}

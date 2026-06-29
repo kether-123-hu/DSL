@@ -1,0 +1,30 @@
+// ============================================================
+// Benchmark: events - net_dev_queue
+// Tests net dev queue event monitoring
+// ============================================================
+
+tool net_dev_queue_event {
+    option interval = 5s;
+}
+
+    observe tracepoint("net:net_dev_queue")
+measure count, latency
+{
+    @net_dev_queue_count[pid, comm] = count();
+    @net_dev_queue_avg[pid, comm]   = avg(latency);
+    @net_dev_queue_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== net dev queue events ===");
+    print(@net_dev_queue_count);
+    print(@net_dev_queue_avg);
+    print(@net_dev_queue_hist);
+}

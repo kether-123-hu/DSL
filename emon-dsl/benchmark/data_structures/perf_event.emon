@@ -1,0 +1,27 @@
+// ============================================================
+// Benchmark: data_structures - perf_event
+// Tests monitoring performance event registration
+// ============================================================
+
+tool perf_event_ds {
+    option interval = 5s;
+}
+
+observe syscall("perf_event_open", "ioctl", "read")
+measure count, retval
+{
+    @perf_event_count[comm, syscall] = count();
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        syscall = syscall;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== perf_event stats ===");
+    print(@perf_event_count);
+}

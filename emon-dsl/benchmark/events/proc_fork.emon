@@ -1,0 +1,30 @@
+// ============================================================
+// Benchmark: events - proc_fork
+// Tests proc fork event monitoring
+// ============================================================
+
+tool proc_fork_event {
+    option interval = 5s;
+}
+
+    observe tracepoint("sched:sched_process_fork")
+measure count, latency
+{
+    @proc_fork_count[pid, comm] = count();
+    @proc_fork_avg[pid, comm]   = avg(latency);
+    @proc_fork_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== proc fork events ===");
+    print(@proc_fork_count);
+    print(@proc_fork_avg);
+    print(@proc_fork_hist);
+}

@@ -1,0 +1,30 @@
+// ============================================================
+// Benchmark: events - vfs_create
+// Tests vfs create event monitoring
+// ============================================================
+
+tool vfs_create_event {
+    option interval = 5s;
+}
+
+    observe file("vfs_create", "do_create")
+measure count, latency
+{
+    @vfs_create_count[pid, comm] = count();
+    @vfs_create_avg[pid, comm]   = avg(latency);
+    @vfs_create_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== vfs create events ===");
+    print(@vfs_create_count);
+    print(@vfs_create_avg);
+    print(@vfs_create_hist);
+}

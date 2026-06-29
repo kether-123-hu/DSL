@@ -1,0 +1,28 @@
+// ============================================================
+// Benchmark: functions - kfree_skb
+// Tests kernel function kprobe for kfree skb
+// ============================================================
+
+tool kfree_skb_func {
+    option interval = 5s;
+}
+
+observe kernel("kfree_skb")
+measure latency
+{
+    @kfree_skb_count[pid, comm] = count();
+    @kfree_skb_avg[pid, comm]   = avg(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== kfree_skb kernel function ===");
+    print(@kfree_skb_count);
+    print(@kfree_skb_avg);
+}

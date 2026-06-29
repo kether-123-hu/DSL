@@ -1,0 +1,30 @@
+// ============================================================
+// Benchmark: events - workqueue_execute_start
+// Tests workqueue execute start event monitoring
+// ============================================================
+
+tool workqueue_execute_start_event {
+    option interval = 5s;
+}
+
+    observe tracepoint("workqueue:workqueue_execute_start")
+measure count, latency
+{
+    @workqueue_execute_start_count[pid, comm] = count();
+    @workqueue_execute_start_avg[pid, comm]   = avg(latency);
+    @workqueue_execute_start_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== workqueue execute start events ===");
+    print(@workqueue_execute_start_count);
+    print(@workqueue_execute_start_avg);
+    print(@workqueue_execute_start_hist);
+}

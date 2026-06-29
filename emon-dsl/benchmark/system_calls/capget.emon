@@ -1,0 +1,31 @@
+// ============================================================
+// Benchmark: system_calls - capget
+// Tests capget syscall monitoring with latency and return value tracking
+// ============================================================
+
+tool capget_syscall {
+    option interval = 5s;
+}
+
+observe syscall("capget")
+measure latency, retval
+{
+    @capget_count[pid, comm] = count();
+    @capget_avg[pid, comm]   = avg(latency);
+    @capget_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== capget syscall stats ===");
+    print(@capget_count);
+    print(@capget_avg);
+    print(@capget_hist);
+}

@@ -1,0 +1,28 @@
+// ============================================================
+// Benchmark: functions - truncate_inode_pages_range
+// Tests kernel function kprobe for truncate inode pages range
+// ============================================================
+
+tool truncate_inode_pages_range_func {
+    option interval = 5s;
+}
+
+observe kernel("truncate_inode_pages_range")
+measure latency
+{
+    @truncate_inode_pages_range_count[pid, comm] = count();
+    @truncate_inode_pages_range_avg[pid, comm]   = avg(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== truncate_inode_pages_range kernel function ===");
+    print(@truncate_inode_pages_range_count);
+    print(@truncate_inode_pages_range_avg);
+}

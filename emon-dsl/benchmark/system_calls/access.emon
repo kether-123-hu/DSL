@@ -1,0 +1,31 @@
+// ============================================================
+// Benchmark: system_calls - access
+// Tests access syscall monitoring with latency and return value tracking
+// ============================================================
+
+tool access_syscall {
+    option interval = 5s;
+}
+
+observe syscall("access")
+measure latency, retval
+{
+    @access_count[pid, comm] = count();
+    @access_avg[pid, comm]   = avg(latency);
+    @access_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== access syscall stats ===");
+    print(@access_count);
+    print(@access_avg);
+    print(@access_hist);
+}

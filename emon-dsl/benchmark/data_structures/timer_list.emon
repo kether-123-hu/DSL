@@ -1,0 +1,27 @@
+// ============================================================
+// Benchmark: data_structures - timer_list
+// Tests monitoring timer list scheduling
+// ============================================================
+
+tool timer_list_ds {
+    option interval = 5s;
+}
+
+observe syscall("timer_create", "timer_gettime", "timer_settime")
+measure count, retval
+{
+    @timer_list_count[comm, syscall] = count();
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        syscall = syscall;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== timer_list stats ===");
+    print(@timer_list_count);
+}

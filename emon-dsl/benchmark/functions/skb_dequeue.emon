@@ -1,0 +1,28 @@
+// ============================================================
+// Benchmark: functions - skb_dequeue
+// Tests kernel function kprobe for skb dequeue
+// ============================================================
+
+tool skb_dequeue_func {
+    option interval = 5s;
+}
+
+observe kernel("skb_dequeue")
+measure latency
+{
+    @skb_dequeue_count[pid, comm] = count();
+    @skb_dequeue_avg[pid, comm]   = avg(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== skb_dequeue kernel function ===");
+    print(@skb_dequeue_count);
+    print(@skb_dequeue_avg);
+}

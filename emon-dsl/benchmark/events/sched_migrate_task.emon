@@ -1,0 +1,30 @@
+// ============================================================
+// Benchmark: events - sched_migrate_task
+// Tests sched migrate task event monitoring
+// ============================================================
+
+tool sched_migrate_task_event {
+    option interval = 5s;
+}
+
+    observe tracepoint("sched:sched_migrate_task")
+measure count, latency
+{
+    @sched_migrate_task_count[pid, comm] = count();
+    @sched_migrate_task_avg[pid, comm]   = avg(latency);
+    @sched_migrate_task_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== sched migrate task events ===");
+    print(@sched_migrate_task_count);
+    print(@sched_migrate_task_avg);
+    print(@sched_migrate_task_hist);
+}

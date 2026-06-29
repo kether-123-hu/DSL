@@ -1,0 +1,27 @@
+// ============================================================
+// Benchmark: data_structures - packet_sock
+// Tests monitoring packet socket traffic
+// ============================================================
+
+tool packet_sock_ds {
+    option interval = 5s;
+}
+
+observe syscall("socket", "sendto", "recvfrom")
+measure count, retval
+{
+    @packet_sock_count[comm, syscall] = count();
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        syscall = syscall;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== packet_sock stats ===");
+    print(@packet_sock_count);
+}

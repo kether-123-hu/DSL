@@ -1,0 +1,31 @@
+// ============================================================
+// Benchmark: system_calls - accept
+// Tests accept syscall monitoring with latency and return value tracking
+// ============================================================
+
+tool accept_syscall {
+    option interval = 5s;
+}
+
+observe syscall("accept")
+measure latency, retval
+{
+    @accept_count[pid, comm] = count();
+    @accept_avg[pid, comm]   = avg(latency);
+    @accept_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== accept syscall stats ===");
+    print(@accept_count);
+    print(@accept_avg);
+    print(@accept_hist);
+}

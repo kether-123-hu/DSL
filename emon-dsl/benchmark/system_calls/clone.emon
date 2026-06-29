@@ -1,0 +1,27 @@
+// ============================================================
+// Benchmark: system_calls - clone
+// Tests clone/fork syscalls monitoring for process creation
+// ============================================================
+
+tool clone_syscall {
+    option interval = 5s;
+}
+
+observe syscall("clone", "fork", "vfork")
+measure count, retval
+{
+    @clone_count[pid, comm, syscall] = count();
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        syscall = syscall;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== clone/fork syscall stats ===");
+    print(@clone_count);
+}

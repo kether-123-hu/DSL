@@ -1,0 +1,30 @@
+// ============================================================
+// Benchmark: events - net_dev_xmit
+// Tests net dev xmit event monitoring
+// ============================================================
+
+tool net_dev_xmit_event {
+    option interval = 5s;
+}
+
+    observe tracepoint("net:net_dev_xmit")
+measure count, latency
+{
+    @net_dev_xmit_count[pid, comm] = count();
+    @net_dev_xmit_avg[pid, comm]   = avg(latency);
+    @net_dev_xmit_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== net dev xmit events ===");
+    print(@net_dev_xmit_count);
+    print(@net_dev_xmit_avg);
+    print(@net_dev_xmit_hist);
+}

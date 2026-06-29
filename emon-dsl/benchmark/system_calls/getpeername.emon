@@ -1,0 +1,31 @@
+// ============================================================
+// Benchmark: system_calls - getpeername
+// Tests getpeername syscall monitoring with latency and return value tracking
+// ============================================================
+
+tool getpeername_syscall {
+    option interval = 5s;
+}
+
+observe syscall("getpeername")
+measure latency, retval
+{
+    @getpeername_count[pid, comm] = count();
+    @getpeername_avg[pid, comm]   = avg(latency);
+    @getpeername_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== getpeername syscall stats ===");
+    print(@getpeername_count);
+    print(@getpeername_avg);
+    print(@getpeername_hist);
+}

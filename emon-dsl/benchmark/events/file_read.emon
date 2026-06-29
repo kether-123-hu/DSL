@@ -1,0 +1,28 @@
+// ============================================================
+// Benchmark: events - file_read
+// Tests file read event monitoring
+// ============================================================
+
+tool file_read_event {
+    option interval = 5s;
+}
+
+observe file("vfs_read", "generic_file_read_iter")
+measure latency
+{
+    @read_count[pid, comm] = count();
+    @read_avg[pid, comm]   = avg(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== file read events ===");
+    print(@read_count);
+    print(@read_avg);
+}

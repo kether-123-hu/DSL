@@ -1,0 +1,30 @@
+// ============================================================
+// Benchmark: events - sched_process_wait
+// Tests sched process wait event monitoring
+// ============================================================
+
+tool sched_process_wait_event {
+    option interval = 5s;
+}
+
+    observe tracepoint("sched:sched_process_wait")
+measure count, latency
+{
+    @sched_process_wait_count[pid, comm] = count();
+    @sched_process_wait_avg[pid, comm]   = avg(latency);
+    @sched_process_wait_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== sched process wait events ===");
+    print(@sched_process_wait_count);
+    print(@sched_process_wait_avg);
+    print(@sched_process_wait_hist);
+}

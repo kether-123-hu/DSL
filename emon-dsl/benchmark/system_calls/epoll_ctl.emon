@@ -1,0 +1,31 @@
+// ============================================================
+// Benchmark: system_calls - epoll_ctl
+// Tests epoll_ctl syscall monitoring with latency and return value tracking
+// ============================================================
+
+tool epoll_ctl_syscall {
+    option interval = 5s;
+}
+
+observe syscall("epoll_ctl")
+measure latency, retval
+{
+    @epoll_ctl_count[pid, comm] = count();
+    @epoll_ctl_avg[pid, comm]   = avg(latency);
+    @epoll_ctl_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== epoll ctl syscall stats ===");
+    print(@epoll_ctl_count);
+    print(@epoll_ctl_avg);
+    print(@epoll_ctl_hist);
+}

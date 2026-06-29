@@ -1,0 +1,30 @@
+// ============================================================
+// Benchmark: events - arp_out
+// Tests arp out event monitoring
+// ============================================================
+
+tool arp_out_event {
+    option interval = 5s;
+}
+
+    observe tracepoint("arp:arp_out")
+measure count, latency
+{
+    @arp_out_count[pid, comm] = count();
+    @arp_out_avg[pid, comm]   = avg(latency);
+    @arp_out_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== arp out events ===");
+    print(@arp_out_count);
+    print(@arp_out_avg);
+    print(@arp_out_hist);
+}

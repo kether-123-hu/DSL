@@ -1,0 +1,31 @@
+// ============================================================
+// Benchmark: system_calls - fchown
+// Tests fchown syscall monitoring with latency and return value tracking
+// ============================================================
+
+tool fchown_syscall {
+    option interval = 5s;
+}
+
+observe syscall("fchown")
+measure latency, retval
+{
+    @fchown_count[pid, comm] = count();
+    @fchown_avg[pid, comm]   = avg(latency);
+    @fchown_hist[pid, comm]  = hist(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== fchown syscall stats ===");
+    print(@fchown_count);
+    print(@fchown_avg);
+    print(@fchown_hist);
+}

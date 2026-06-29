@@ -1,0 +1,29 @@
+// ============================================================
+// Benchmark: events - net_udp
+// Tests UDP network event monitoring
+// ============================================================
+
+tool net_udp_event {
+    option interval = 5s;
+}
+
+observe net("udp_sendmsg", "udp_recvmsg")
+measure latency
+{
+    @udp_count[pid, func] = count();
+    @udp_avg[pid, func]  = avg(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        func    = func;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== UDP network events ===");
+    print(@udp_count);
+    print(@udp_avg);
+}

@@ -1,0 +1,28 @@
+// ============================================================
+// Benchmark: functions - dev_alloc_skb
+// Tests kernel function kprobe for dev alloc skb
+// ============================================================
+
+tool dev_alloc_skb_func {
+    option interval = 5s;
+}
+
+observe kernel("dev_alloc_skb")
+measure latency
+{
+    @dev_alloc_skb_count[pid, comm] = count();
+    @dev_alloc_skb_avg[pid, comm]   = avg(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== dev_alloc_skb kernel function ===");
+    print(@dev_alloc_skb_count);
+    print(@dev_alloc_skb_avg);
+}

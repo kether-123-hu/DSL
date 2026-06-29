@@ -1,0 +1,30 @@
+// ============================================================
+// Benchmark: data_structures - fs_struct
+// Tests monitoring filesystem via chdir/fchdir syscalls
+// ============================================================
+
+tool fs_struct_ds {
+    option interval = 5s;
+}
+
+observe syscall("chdir", "fchdir", "chroot", "pivot_root")
+measure latency, retval
+{
+    @fs_count[comm, syscall] = count();
+    @fs_avg[comm, syscall]  = avg(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        syscall = syscall;
+        latency = latency;
+        retval  = retval;
+    };
+}
+
+every interval {
+    print("=== fs_struct (filesystem) stats ===");
+    print(@fs_count);
+    print(@fs_avg);
+}

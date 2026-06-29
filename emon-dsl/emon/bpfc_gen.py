@@ -32,7 +32,13 @@ def _indent(text: str, level: int = 1, first: bool = False) -> str:
 
 def _safe_c_name(name: str) -> str:
     """Convert a name to a valid C identifier."""
-    return name.replace("@", "").replace("-", "_").replace(".", "_")
+    # Replace invalid identifier characters with underscores.
+    # Keep letters, digits and underscores only.
+    safe = ''.join(ch if ch.isalnum() or ch == '_' else '_' for ch in name)
+    # Avoid leading digits in identifiers.
+    if safe and safe[0].isdigit():
+        safe = '_' + safe
+    return safe
 
 
 # =============================================================================
