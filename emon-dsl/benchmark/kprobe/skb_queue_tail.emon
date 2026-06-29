@@ -1,0 +1,28 @@
+// ============================================================
+// Benchmark: kprobe - skb_queue_tail
+// Tests kernel kprobe for function skb_queue_tail
+// ============================================================
+
+tool skb_queue_tail_kp {
+    option interval = 5s;
+}
+
+observe kernel("skb_queue_tail")
+measure latency
+{
+    @skb_queue_tail_count[pid, comm] = count();
+    @skb_queue_tail_avg[pid, comm]   = avg(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== skb_queue_tail kprobe ===");
+    print(@skb_queue_tail_count);
+    print(@skb_queue_tail_avg);
+}

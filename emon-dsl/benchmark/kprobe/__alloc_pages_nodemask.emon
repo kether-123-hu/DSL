@@ -1,0 +1,28 @@
+// ============================================================
+// Benchmark: kprobe - __alloc_pages_nodemask
+// Tests kernel kprobe for function __alloc_pages_nodemask
+// ============================================================
+
+tool double_alloc_pages_nodemask_kp {
+    option interval = 5s;
+}
+
+observe kernel("__alloc_pages_nodemask")
+measure latency
+{
+    @double_alloc_pages_nodemask_count[pid, comm] = count();
+    @double_alloc_pages_nodemask_avg[pid, comm]   = avg(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== __alloc_pages_nodemask kprobe ===");
+    print(@double_alloc_pages_nodemask_count);
+    print(@double_alloc_pages_nodemask_avg);
+}

@@ -1,0 +1,28 @@
+// ============================================================
+// Benchmark: kprobe - kmalloc
+// Tests kernel kprobe for function kmalloc
+// ============================================================
+
+tool kmalloc_kp {
+    option interval = 5s;
+}
+
+observe kernel("kmalloc")
+measure latency
+{
+    @kmalloc_count[pid, comm] = count();
+    @kmalloc_avg[pid, comm]   = avg(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== kmalloc kprobe ===");
+    print(@kmalloc_count);
+    print(@kmalloc_avg);
+}

@@ -1,0 +1,28 @@
+// ============================================================
+// Benchmark: kprobe - __kmalloc
+// Tests kernel kprobe for function __kmalloc
+// ============================================================
+
+tool double_kmalloc_kp {
+    option interval = 5s;
+}
+
+observe kernel("__kmalloc")
+measure latency
+{
+    @double_kmalloc_count[pid, comm] = count();
+    @double_kmalloc_avg[pid, comm]   = avg(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== __kmalloc kprobe ===");
+    print(@double_kmalloc_count);
+    print(@double_kmalloc_avg);
+}

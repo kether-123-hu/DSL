@@ -1,0 +1,28 @@
+// ============================================================
+// Benchmark: kprobe - vfs_fallocate
+// Tests kernel kprobe for function vfs_fallocate
+// ============================================================
+
+tool vfs_fallocate_kp {
+    option interval = 5s;
+}
+
+observe kernel("vfs_fallocate")
+measure latency
+{
+    @vfs_fallocate_count[pid, comm] = count();
+    @vfs_fallocate_avg[pid, comm]   = avg(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== vfs_fallocate kprobe ===");
+    print(@vfs_fallocate_count);
+    print(@vfs_fallocate_avg);
+}

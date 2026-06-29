@@ -1,0 +1,28 @@
+// ============================================================
+// Benchmark: kprobe - page_cache_sync
+// Tests kernel kprobe for function page_cache_sync
+// ============================================================
+
+tool page_cache_sync_kp {
+    option interval = 5s;
+}
+
+observe kernel("page_cache_sync")
+measure latency
+{
+    @page_cache_sync_count[pid, comm] = count();
+    @page_cache_sync_avg[pid, comm]   = avg(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== page_cache_sync kprobe ===");
+    print(@page_cache_sync_count);
+    print(@page_cache_sync_avg);
+}

@@ -1,0 +1,28 @@
+// ============================================================
+// Benchmark: kprobe - vfs_fsync
+// Tests kernel kprobe for function vfs_fsync
+// ============================================================
+
+tool vfs_fsync_kp {
+    option interval = 5s;
+}
+
+observe kernel("vfs_fsync")
+measure latency
+{
+    @vfs_fsync_count[pid, comm] = count();
+    @vfs_fsync_avg[pid, comm]   = avg(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== vfs_fsync kprobe ===");
+    print(@vfs_fsync_count);
+    print(@vfs_fsync_avg);
+}

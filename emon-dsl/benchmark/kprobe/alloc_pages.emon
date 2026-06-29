@@ -1,0 +1,28 @@
+// ============================================================
+// Benchmark: kprobe - alloc_pages
+// Tests kernel kprobe for function alloc_pages
+// ============================================================
+
+tool alloc_pages_kp {
+    option interval = 5s;
+}
+
+observe kernel("alloc_pages")
+measure latency
+{
+    @alloc_pages_count[pid, comm] = count();
+    @alloc_pages_avg[pid, comm]   = avg(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== alloc_pages kprobe ===");
+    print(@alloc_pages_count);
+    print(@alloc_pages_avg);
+}

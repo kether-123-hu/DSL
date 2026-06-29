@@ -1,0 +1,28 @@
+// ============================================================
+// Benchmark: kprobe - __filemap_fdatawrite_range
+// Tests kernel kprobe for function __filemap_fdatawrite_range
+// ============================================================
+
+tool double_filemap_fdatawrite_range_kp {
+    option interval = 5s;
+}
+
+observe kernel("__filemap_fdatawrite_range")
+measure latency
+{
+    @double_filemap_fdatawrite_range_count[pid, comm] = count();
+    @double_filemap_fdatawrite_range_avg[pid, comm]   = avg(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== __filemap_fdatawrite_range kprobe ===");
+    print(@double_filemap_fdatawrite_range_count);
+    print(@double_filemap_fdatawrite_range_avg);
+}

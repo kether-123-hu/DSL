@@ -1,0 +1,28 @@
+// ============================================================
+// Benchmark: kprobe - filemap_write_and_wait
+// Tests kernel kprobe for function filemap_write_and_wait
+// ============================================================
+
+tool filemap_write_and_wait_kp {
+    option interval = 5s;
+}
+
+observe kernel("filemap_write_and_wait")
+measure latency
+{
+    @filemap_write_and_wait_count[pid, comm] = count();
+    @filemap_write_and_wait_avg[pid, comm]   = avg(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== filemap_write_and_wait kprobe ===");
+    print(@filemap_write_and_wait_count);
+    print(@filemap_write_and_wait_avg);
+}

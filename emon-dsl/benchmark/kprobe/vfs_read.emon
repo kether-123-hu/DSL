@@ -1,0 +1,28 @@
+// ============================================================
+// Benchmark: kprobe - vfs_read
+// Tests kernel kprobe for function vfs_read
+// ============================================================
+
+tool vfs_read_kp {
+    option interval = 5s;
+}
+
+observe kernel("vfs_read")
+measure latency
+{
+    @vfs_read_count[pid, comm] = count();
+    @vfs_read_avg[pid, comm]   = avg(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== vfs_read kprobe ===");
+    print(@vfs_read_count);
+    print(@vfs_read_avg);
+}

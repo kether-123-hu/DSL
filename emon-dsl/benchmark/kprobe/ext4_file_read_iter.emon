@@ -1,0 +1,28 @@
+// ============================================================
+// Benchmark: kprobe - ext4_file_read_iter
+// Tests kernel kprobe for function ext4_file_read_iter
+// ============================================================
+
+tool ext4_file_read_iter_kp {
+    option interval = 5s;
+}
+
+observe kernel("ext4_file_read_iter")
+measure latency
+{
+    @ext4_file_read_iter_count[pid, comm] = count();
+    @ext4_file_read_iter_avg[pid, comm]   = avg(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== ext4_file_read_iter kprobe ===");
+    print(@ext4_file_read_iter_count);
+    print(@ext4_file_read_iter_avg);
+}

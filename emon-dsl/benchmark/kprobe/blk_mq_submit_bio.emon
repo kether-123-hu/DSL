@@ -1,0 +1,28 @@
+// ============================================================
+// Benchmark: kprobe - blk_mq_submit_bio
+// Tests kernel kprobe for function blk_mq_submit_bio
+// ============================================================
+
+tool blk_mq_submit_bio_kp {
+    option interval = 5s;
+}
+
+observe kernel("blk_mq_submit_bio")
+measure latency
+{
+    @blk_mq_submit_bio_count[pid, comm] = count();
+    @blk_mq_submit_bio_avg[pid, comm]   = avg(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== blk_mq_submit_bio kprobe ===");
+    print(@blk_mq_submit_bio_count);
+    print(@blk_mq_submit_bio_avg);
+}

@@ -1,0 +1,28 @@
+// ============================================================
+// Benchmark: kprobe - vfs_write
+// Tests kernel kprobe for function vfs_write
+// ============================================================
+
+tool vfs_write_kp {
+    option interval = 5s;
+}
+
+observe kernel("vfs_write")
+measure latency
+{
+    @vfs_write_count[pid, comm] = count();
+    @vfs_write_avg[pid, comm]   = avg(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== vfs_write kprobe ===");
+    print(@vfs_write_count);
+    print(@vfs_write_avg);
+}

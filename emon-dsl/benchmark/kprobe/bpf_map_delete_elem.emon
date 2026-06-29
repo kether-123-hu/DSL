@@ -1,0 +1,28 @@
+// ============================================================
+// Benchmark: kprobe - bpf_map_delete_elem
+// Tests kernel kprobe for function bpf_map_delete_elem
+// ============================================================
+
+tool bpf_map_delete_elem_kp {
+    option interval = 5s;
+}
+
+observe kernel("bpf_map_delete_elem")
+measure latency
+{
+    @bpf_map_delete_elem_count[pid, comm] = count();
+    @bpf_map_delete_elem_avg[pid, comm]   = avg(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== bpf_map_delete_elem kprobe ===");
+    print(@bpf_map_delete_elem_count);
+    print(@bpf_map_delete_elem_avg);
+}

@@ -1,0 +1,28 @@
+// ============================================================
+// Benchmark: kprobe - do_sys_open
+// Tests kernel kprobe for function do_sys_open
+// ============================================================
+
+tool do_sys_open_kp {
+    option interval = 5s;
+}
+
+observe kernel("do_sys_open")
+measure latency
+{
+    @do_sys_open_count[pid, comm] = count();
+    @do_sys_open_avg[pid, comm]   = avg(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== do_sys_open kprobe ===");
+    print(@do_sys_open_count);
+    print(@do_sys_open_avg);
+}

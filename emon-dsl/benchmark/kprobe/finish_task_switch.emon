@@ -1,0 +1,28 @@
+// ============================================================
+// Benchmark: kprobe - finish_task_switch
+// Tests kernel kprobe for function finish_task_switch
+// ============================================================
+
+tool finish_task_switch_kp {
+    option interval = 5s;
+}
+
+observe kernel("finish_task_switch")
+measure latency
+{
+    @finish_task_switch_count[pid, comm] = count();
+    @finish_task_switch_avg[pid, comm]   = avg(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== finish_task_switch kprobe ===");
+    print(@finish_task_switch_count);
+    print(@finish_task_switch_avg);
+}

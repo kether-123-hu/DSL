@@ -1,0 +1,28 @@
+// ============================================================
+// Benchmark: kprobe - wake_up_process
+// Tests kernel kprobe for function wake_up_process
+// ============================================================
+
+tool wake_up_process_kp {
+    option interval = 5s;
+}
+
+observe kernel("wake_up_process")
+measure latency
+{
+    @wake_up_process_count[pid, comm] = count();
+    @wake_up_process_avg[pid, comm]   = avg(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+every interval {
+    print("=== wake_up_process kprobe ===");
+    print(@wake_up_process_count);
+    print(@wake_up_process_avg);
+}
