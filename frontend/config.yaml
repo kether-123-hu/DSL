@@ -1,0 +1,55 @@
+# Emon DSL Frontend Configuration
+# ============================================================
+
+# 常规设置
+app:
+  title: "Emon DSL — eBPF 实时监控仪表盘"
+  icon: "📊"
+  layout: "wide"
+  refresh_interval: 1  # 秒
+
+# BPF 数据源
+bpf:
+  # 方式 1: 通过 bpftool 读取 BPF map (推荐)
+  # 每个监控工具都是一个独立的 section
+  tools:
+    - name: "file_monitor"
+      map_name: "f_count"
+      map_type: "hash"
+      key_fields: ["syscall", "comm"]
+      description: "文件系统操作监控"
+      enabled: true
+
+    - name: "syscall_counter"
+      map_name: "count"
+      map_type: "hash"
+      key_fields: ["pid", "comm", "syscall"]
+      description: "系统调用计数"
+      enabled: true
+
+    - name: "kprobe_monitor"
+      map_name: "k_count"
+      map_type: "hash"
+      key_fields: ["func"]
+      description: "内核函数监控"
+      enabled: false
+
+  # 方式 2: 通过 eBPF skeleton 直接读取 (高级)
+  # 如果使用这种方式, 需要先编译并加载 eBPF 程序
+  direct_attach: false
+
+# 图表设置
+chart:
+  window_seconds: 20          # 监控窗口 (秒)
+  max_series: 15              # 最多显示的图例数量
+  color_scheme: "category20"  # Altair 配色方案
+  height: 400                 # 图表高度
+
+# 告警设置 (可选)
+alerts:
+  enabled: false
+  threshold_rules:
+    - metric: "count"
+      condition: ">"
+      value: 10000
+      message: "高频操作告警"
