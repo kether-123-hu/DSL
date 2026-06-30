@@ -1,25 +1,19 @@
 // ============================================================
 // Emon DSL Example: File System Events
-// Monitors file operations via kprobe.
+// Monitors file I/O via syscall tracepoints.
+//
 // ============================================================
 
 tool file_monitor {
     option interval = 3s;
 }
 
-observe file("vfs_read", "vfs_write", "vfs_open")
+observe syscall("read", "write", "openat", "close")
 measure latency
 {
-    @f_count[func, comm]   = count();
-    @f_avg[func, comm]     = avg(latency);
+    @f_count[syscall, comm]   = count();
+    @f_avg[syscall, comm]     = avg(latency);
 
-    emit {
-        time    = nsecs;
-        func    = func;
-        comm    = comm;
-        pid     = pid;
-        latency = latency;
-    };
 }
 
 every interval {

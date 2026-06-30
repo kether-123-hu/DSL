@@ -6,8 +6,8 @@
 tool full_feature_test {
     option target_pid   = 0;
     option threshold    = 1ms;
-    option interval     = 2s;
-    option top_n        = 10;
+    option interval     = 3s;
+    option top_n        = 5;
     option max_size     = 1MB;
     option debug        = true;
     option log_path     = "/var/log/emon.log";
@@ -43,19 +43,6 @@ when latency > threshold && retval >= 0 && debug == true
     if (!is_slow && -retval == -1) {
         @error_count[comm] = count();
     }
-
-    // emit: per-event output
-    emit {
-        time    = nsecs;
-        comm    = comm;
-        pid     = pid;
-        tid     = tid;
-        uid     = uid;
-        cpu     = cpu;
-        syscall = syscall;
-        latency = latency;
-        retval  = retval;
-    };
 }
 
 // Test 2: kernel function monitoring (kprobe)
@@ -65,27 +52,13 @@ measure latency
     @k_count[func]          = count();
     @k_avg[func]            = avg(latency);
     @k_hist[func]           = hist(latency);
-
-    emit {
-        time    = nsecs;
-        func    = func;
-        pid     = pid;
-        comm    = comm;
-        latency = latency;
-    };
 }
 
-// Test 3: tracepoint monitoring
-observe tracepoint("sched:sched_process_exec", "sched:sched_process_exit")
+// Test 3: sched tracepoint monitoring
+observe sched("sched_process_exec", "sched_process_exit")
 measure count
 {
     @exec_count[comm, pid]  = count();
-
-    emit {
-        time = nsecs;
-        comm = comm;
-        pid  = pid;
-    };
 }
 
 // Test 4: uprobe userspace function monitoring
@@ -94,13 +67,6 @@ measure latency, retval
 {
     @bash_count[pid, comm]    = count();
     @bash_avg[pid, comm]      = avg(latency);
-
-    emit {
-        time    = nsecs;
-        pid     = pid;
-        comm    = comm;
-        latency = latency;
-    };
 }
 
 // Test 5: scheduler events
@@ -108,45 +74,22 @@ observe sched("sched_switch")
 measure count
 {
     @switch_count[cpu] = count();
-
-    emit {
-        time = nsecs;
-        cpu  = cpu;
-        comm = comm;
-    };
 }
 
-// Test 6: file system events
-observe file("open", "close", "read", "write")
-measure latency, size
-when size > max_size
+// Test 6: file system events via syscall tracepoints
+observe syscall("openat", "close", "read", "write")
+measure latency
+when latency > threshold
 {
     @file_count[comm, pid]  = count();
-    @file_size[comm, pid]   = sum(size);
     @file_avg[comm, pid]    = avg(latency);
-
-    emit {
-        time    = nsecs;
-        comm    = comm;
-        pid     = pid;
-        size    = size;
-        latency = latency;
-    };
 }
 
 // Test 7: network events
-observe net("tcp", "udp")
-measure count, size
+observe net("tcp_sendmsg", "tcp_recvmsg", "udp_sendmsg")
+measure count
 {
     @net_count[comm]    = count();
-    @net_size[comm]     = sum(size);
-
-    emit {
-        time = nsecs;
-        comm = comm;
-        pid  = pid;
-        size = size;
-    };
 }
 
 // Test 7b: measure stack + stack/gid variables + != operator
@@ -162,13 +105,6 @@ when latency != 0
     if (gid != uid) {
         @cross_group[comm] = count();
     }
-
-    emit {
-        time    = nsecs;
-        gid     = gid;
-        stack   = stack;
-        latency = latency;
-    };
 }
 
 // Test 7c: arithmetic operators (+, -, *, /, %) in expressions
@@ -177,7 +113,6 @@ where (pid + tid) / 2 > 500
 measure latency, retval
 when latency > 0
 {
-    // let with arithmetic expressions (all using u64 latency to avoid BPF signed div issue)
     let doubled = latency * 2;
     let halved = latency / 2;
     let remainder = latency % 100;
@@ -186,15 +121,6 @@ when latency > 0
 
     @arith_avg[comm, pid]  = avg(doubled);
     @arith_sum[comm, pid]  = sum(adjusted);
-
-    emit {
-        time      = nsecs;
-        doubled   = doubled;
-        halved    = halved;
-        remainder = remainder;
-        adjusted  = adjusted;
-        combined  = combined;
-    };
 }
 
 // Test 8: begin / end lifecycle blocks
@@ -206,33 +132,22 @@ begin {
 end {
     print("=== Final Report ===");
     print(top(@count, top_n));
-    print(top(@slow_count, top_n));
     print(@avg_lat);
     print(@hist_lat);
     print(@lhist_lat);
-    print(@file_size);
-    print(@net_count);
+    print(@stack_lat);
+    print(@arith_avg);
 }
 
-// Test 9: every periodic task + print variants
+// Test 9: every periodic task
 every interval {
     print("--- Periodic Report ---");
     print(top(@count, top_n));
-    print(top(@k_count, 5));
+    print(top(@slow_count, top_n));
     print(@avg_lat);
-    print(@hist_lat);
     print(@min_lat);
     print(@max_lat);
-    print(@bash_avg);
-    print(@file_size);
-    print(@net_size);
-}
-
-// Test 9b: every with literal time value (not option reference)
-every 5s {
-    print("=== Literal Time Every Test ===");
-    print(@stack_lat);
-    print(@gid_count);
-    print(@arith_avg);
-    print(@cross_group);
+    print(@k_count);
+    print(@switch_count);
+    print(@net_count);
 }

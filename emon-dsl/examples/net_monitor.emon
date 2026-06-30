@@ -10,8 +10,8 @@ tool net_monitor {
 observe net("tcp_sendmsg", "tcp_recvmsg", "udp_sendmsg")
 measure latency
 {
-    @net_count[func, pid] = count();
-    @net_avg[func]        = avg(latency);
+    @net_count[comm, pid]  = count();
+    @net_avg[comm]         = avg(latency);
 
     emit {
         time    = nsecs;
@@ -20,4 +20,9 @@ measure latency
         comm    = comm;
         latency = latency;
     };
+}
+
+end {
+    print(top(@net_count, top_n));   // 退出时只打印 top 5
+    print(top(@net_avg, top_n));
 }

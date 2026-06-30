@@ -73,6 +73,7 @@ class IRProbe:
     when_conditions: List[str] = field(default_factory=list)
     measures_latency: bool = False
     aggregations: List[IRAggregation] = field(default_factory=list)
+    binary_path: str = ""       # only for UPROBE hooks
     emits: List[IREmit] = field(default_factory=list)
     lets: List[Dict[str, str]] = field(default_factory=list)  # [{"name":"x","init":"100"}]
     if_stmts: List[Dict[str, Any]] = field(default_factory=list)
@@ -168,7 +169,7 @@ def _serialize_expr(expr: Expr) -> str:
 # Section Name Generator
 # =============================================================================
 
-def _make_section(hook_kind: HookKind, target: str, is_exit: bool) -> str:
+def _make_section(hook_kind: HookKind, target: str, is_exit: bool, binary_path: str = "") -> str:
     """Generate the BPF program section name for a hook."""
     kind_map = {
         HookKind.SYSCALL:    ("tracepoint/syscalls/sys_enter_", "tracepoint/syscalls/sys_exit_"),
@@ -181,6 +182,9 @@ def _make_section(hook_kind: HookKind, target: str, is_exit: bool) -> str:
     }
     prefix = kind_map.get(hook_kind, ("kprobe/", "kretprobe/"))
     section_base = prefix[1] if is_exit else prefix[0]
+    # Uprobe needs binary path: uprobe//bin/bash:readline
+    if hook_kind == HookKind.UPROBE and binary_path:
+        return f"{section_base}{binary_path}:{target}"
     return section_base + target
 
 
@@ -272,16 +276,18 @@ class IRBuilder:
         )
         targets = rule.hook.targets
         hook_kind = rule.hook.kind
+        binary_path = rule.hook.binary_path or ""
 
         probes = []
         for target in targets:
             # Entry probe (always)
             entry = IRProbe(
-                section=_make_section(hook_kind, target, False),
+                section=_make_section(hook_kind, target, False, binary_path),
                 hook_kind=hook_kind.name,
                 hook_target=target,
                 is_exit=False,
                 measures_latency=measures_latency,
+                binary_path=binary_path,
             )
             self._fill_probe_conditions(entry, rule)
             # Entry probe with latency: only where conditions, NO actions
@@ -293,11 +299,12 @@ class IRBuilder:
             # Exit probe (only when latency is measured)
             if measures_latency:
                 exit_probe = IRProbe(
-                    section=_make_section(hook_kind, target, True),
+                    section=_make_section(hook_kind, target, True, binary_path),
                     hook_kind=hook_kind.name,
                     hook_target=target,
                     is_exit=True,
                     measures_latency=True,
+                    binary_path=binary_path,
                 )
                 self._fill_probe_conditions(exit_probe, rule)
                 # Exit probe: ALL actions go here

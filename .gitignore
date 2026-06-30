@@ -141,3 +141,5 @@ Sessionx.vim
 *.deb
 *.rpm
 *.snap
+
+USEAGE.md

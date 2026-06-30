@@ -81,6 +81,7 @@ class LoaderGenerator:
 #include <signal.h>
 #include <time.h>
 #include <errno.h>
+#include <poll.h>
 #include <bpf/libbpf.h>
 #include <bpf/bpf.h>
 
@@ -204,20 +205,40 @@ static int __handle_event(void *ctx, void *data, size_t data_sz) {{
         lines: List[str] = []
         lines.append("// ---- Map dump helpers ----")
         lines.append(r"""
-// Helper: print a key - shows comm-like prefix + hex for binary parts
+// Helper: print a composite key with smart field detection.
+// Detects 16-byte string fields (comm/syscall/func) and 4-byte ints (pid/cpu).
 static void __print_key(const unsigned char *key, int key_size) {
-    // Print first 16 bytes as string if they look like a comm name
-    int i, str_end = 0;
-    for (i = 0; i < key_size && i < 16; i++) {
-        if (key[i] == 0) { str_end = i; break; }
-        if (key[i] < 32 || key[i] > 126) { str_end = -1; break; }
+    int pos = 0;
+    int first = 1;
+    int seen_string = 0;  // only skip zero-padding after a string field
+    while (pos < key_size) {
+        // Skip zero-padded remainder of a string field
+        if (seen_string && key[pos] == 0) { pos += 16; continue; }
+        // Try to read a null-terminated ASCII string starting at pos
+        int str_end = -1;
+        int max_chunk = (key_size - pos) < 16 ? (key_size - pos) : 16;
+        int i;
+        for (i = 0; i < max_chunk; i++) {
+            if (key[pos + i] == 0) { str_end = i; break; }
+            if (key[pos + i] < 32 || key[pos + i] > 126) { break; }
+        }
+        if (str_end > 0 && i == str_end) {
+            // Valid printable string ending with null
+            if (!first) fputc(' ', stdout);
+            fprintf(stdout, "%.*s", str_end, (const char *)(key + pos));
+            first = 0;
+            seen_string = 1;
+            pos += 16;
+        } else {
+            // Print as hex (likely numeric field like pid/cpu)
+            int hex_len = (key_size - pos) < 4 ? (key_size - pos) : 4;
+            if (!first) fputc(' ', stdout);
+            for (i = 0; i < hex_len; i++)
+                fprintf(stdout, "%02x", key[pos + i]);
+            first = 0;
+            pos += hex_len;
+        }
     }
-    if (str_end > 0) {
-        fprintf(stdout, "%.*s ", str_end, (const char *)key);
-    }
-    // Print remaining bytes as hex
-    for (i = (str_end > 0 ? 16 : 0); i < key_size && i < 36; i++)
-        fprintf(stdout, "%02x", key[i]);
 }
 
 // Sum a PERCPU value across all CPUs
@@ -246,14 +267,23 @@ static void __print_map_{map_safe}(int top_n) {{
     if (fd < 0) return;
 
     int key_size = (int)bpf_map__key_size(map);
-    if (key_size <= 0 || key_size > 64) key_size = 64;
+    if (key_size <= 0) key_size = 4;
     int nr_cpus = libbpf_num_possible_cpus();
     if (nr_cpus <= 0) nr_cpus = 1;
     int val_size = (int)bpf_map__value_size(map);
     if (val_size <= 0) val_size = 8;
 
-    unsigned char key[64];
-    unsigned char next_key[64];
+    // Stack buffer for common small keys; heap for large keys
+    int use_heap_key = (key_size > 64);
+    unsigned char key_stack[64];
+    unsigned char next_key_stack[64];
+    unsigned char *key = use_heap_key ? (unsigned char *)malloc(key_size) : key_stack;
+    unsigned char *next_key = use_heap_key ? (unsigned char *)malloc(key_size) : next_key_stack;
+    if (use_heap_key && (!key || !next_key)) {{
+        fprintf(stderr, "map '{m.name}': malloc(%d) for key failed\\n", key_size);
+        if (key) free(key);
+        return;
+    }}
     // PERCPU maps need val_size * nr_cpus bytes for lookup_elem.
     // Use stack buffer for small values, heap for large (nr_cpus can be 128+).
     int total_val = val_size * nr_cpus;
@@ -264,20 +294,21 @@ static void __print_map_{map_safe}(int top_n) {{
         value_buf = (unsigned char *)malloc(total_val);
         if (!value_buf) {{
             fprintf(stderr, "map '{m.name}': malloc(%d) failed\\n", total_val);
+            if (use_heap_key) {{ free(key); free(next_key); }}
             return;
         }}
         use_heap = 1;
     }}
     int buf_size = use_heap ? total_val : (int)sizeof(stack_buf);
-    memset(key, 0, sizeof(key));
-    memset(next_key, 0, sizeof(next_key));
+    memset(key, 0, key_size);
+    memset(next_key, 0, key_size);
     memset(value_buf, 0, buf_size);
     int count = 0;
 
     fprintf(stdout, "\\n-- @{m.name} --\\n");
 
     int err = bpf_map_get_next_key(fd, NULL, next_key);
-    while (err == 0) {{
+    while (err == 0 && !__stop) {{
         memcpy(key, next_key, key_size);
         memset(value_buf, 0, buf_size);
         if (bpf_map_lookup_elem(fd, key, value_buf) == 0) {{
@@ -330,6 +361,7 @@ static void __print_map_{map_safe}(int top_n) {{
         fprintf(stdout, "  total: %d entries\\n", count);
 
     if (use_heap) free(value_buf);
+    if (use_heap_key) {{ free(key); free(next_key); }}
 }}
 """)
 
@@ -383,8 +415,9 @@ static void __print_map_{map_safe}(int top_n) {{
         goto cleanup;
     }}"""
             rb_poll = f"""\
-        // Poll ring buffer for events
-        ring_buffer__poll(__rb, 100);"""
+        // Poll ring buffer for events (skip if stop requested)
+        if (!__stop)
+            ring_buffer__poll(__rb, 50);"""
             rb_destroy = "    ring_buffer__free(__rb);"
 
         return f"""\
@@ -402,6 +435,8 @@ int main(int argc, char **argv) {{
 
     // ---- Signal handlers ----
     __setup_signals();
+    // Disable stdout buffering so Ctrl+C output is never lost
+    setbuf(stdout, NULL);
 
     // ---- Load BPF skeleton ----
     __skel = {tool}_bpf__open();
@@ -441,6 +476,7 @@ int main(int argc, char **argv) {{
     }}
 
     // ---- end block ----
+    __stop = 0;  // re-enable map iteration for end block
 {end_code}
 
 {self._emit_default_end_dump()}
@@ -463,7 +499,9 @@ cleanup:
             return ""  # No maps to dump
 
         lines = ["    // ---- Default end: dump all maps ----",
-                 '    fprintf(stdout, "\\n==== Final Report ====\\n");']
+                 '    __stop = 0;  // re-enable iteration for final dump',
+                 '    fprintf(stdout, "\\n==== Final Report ====\\n");',
+                 '    fflush(stdout);']
         for m in self.ir.maps:
             map_safe = _safe_c_name(m.name)
             lines.append(f"    __print_map_{map_safe}(20);")
@@ -477,10 +515,28 @@ cleanup:
         lines = [f"    // ---- {kind} block ----"]
         for stmt in stmts:
             expr = stmt.expr
-            # Check if it's a string literal
             if expr.startswith('"') and expr.endswith('"'):
                 inner = expr[1:-1]
                 lines.append(f'    fprintf(stdout, "{inner}\\n");')
+            elif expr.startswith("@") and "(" not in expr:
+                agg_name = expr.lstrip("@")
+                map_safe = _safe_c_name(agg_name)
+                lines.append(f"    __print_map_{map_safe}(20);")
+            elif expr.startswith("top("):
+                inner = expr[4:-1]
+                parts = inner.rsplit(",", 1)
+                if len(parts) == 2:
+                    agg_ref = parts[0].strip().lstrip("@")
+                    top_n = parts[1].strip()
+                    map_safe = _safe_c_name(agg_ref)
+                    if top_n.isdigit():
+                        n_val = top_n
+                    else:
+                        opt_val = self._get_option_value(top_n)
+                        n_val = opt_val if opt_val.isdigit() else "10"
+                    lines.append(f"    __print_map_{map_safe}({n_val});")
+                else:
+                    lines.append(f'    fprintf(stdout, "  {expr}\\n");')
             else:
                 lines.append(f'    fprintf(stdout, "  {expr}\\n");')
         return "\n".join(lines)
@@ -491,12 +547,16 @@ cleanup:
             # No every task: just poll in small chunks for Ctrl+C responsiveness
             return """\
         int __i;
-        for (__i = 0; __i < 4 && !__stop; __i++)
-            usleep(50000);  // 50ms * 4 = 200ms"""
+        for (__i = 0; __i < 100 && !__stop; __i++)
+            poll(NULL, 0, 10);  // 10ms * 100 = 1s chunks, reliably interruptible"""
 
         # For simplicity, merge all every-tasks with the first interval
         task = self.ir.every_tasks[0]
         interval = task.interval
+
+        # Resolve option reference (e.g. "interval" → "3s")
+        if interval in self._opt_map:
+            interval = self._opt_map[interval]
 
         # Convert time literal to seconds
         sleep_sec = self._interval_to_seconds(interval)
@@ -542,10 +602,11 @@ cleanup:
                 lines.append(f'            fprintf(stdout, "  {expr}\\n");')
 
         lines.append("        }")
-        lines.append(f"        // Small sleep chunks for Ctrl+C responsiveness")
+        lines.append("        fflush(stdout);")
+        lines.append(f"        // Sleep in small chunks for Ctrl+C responsiveness")
         lines.append(f"        int __j;")
-        lines.append(f"        for (__j = 0; __j < {max(1, sleep_sec * 20)} && !__stop; __j++)")
-        lines.append(f"            usleep(50000);  // 50ms")
+        lines.append(f"        for (__j = 0; __j < {max(1, sleep_sec * 100)} && !__stop; __j++)")
+        lines.append(f"            poll(NULL, 0, 10);  // 10ms, reliably interruptible")
 
         return "\n".join(lines)
 
