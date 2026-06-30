@@ -1,0 +1,393 @@
+// ===================================================================
+// emon.lark —— Emon DSL 语法定义文件（Lark 格式）
+// ===================================================================
+//
+// 【本文件的作用】
+// 这是 Emon DSL 语言的"语法宪法"——它精确定义了
+// 什么样的代码是合法的 Emon 程序。
+//
+// 【Lark 是什么？】
+// Lark 是 Python 的一个通用解析框架。你只需要用类似 EBNF
+// （扩展巴科斯-瑙尔范式）的语法描述语言规则，Lark 就能
+// 自动生成解析器。这比手写解析器要简单和可靠得多。
+//
+// 【语法规则的含义】
+//   规则名: 规则体          → 定义一条语法规则
+//   "keyword"               → 必须匹配的关键字
+//   rule1 rule2             → 两个规则按顺序出现
+//   rule1 | rule2           → 匹配 rule1 或 rule2（二选一）
+//   [rule]                  → 可选（出现0次或1次）
+//   rule*                   → 重复（出现0次或多次）
+//   rule+                   → 重复（出现1次或多次）
+//   rule ("," rule)*        → 逗号分隔的列表
+//   %ignore /pattern/       → 忽略匹配此正则的内容（如空白、注释）
+//
+// 【本文件的组织】
+//   第一部分：词法终结符（Token 的正则定义）
+//   第二部分：程序顶层结构
+//   第三部分：Observe 语句
+//   第四部分：代码块和动作语句
+//   第五部分：生命周期语句（every/begin/end）
+//   第六部分：表达式系统（按优先级从低到高排列）
+// ===================================================================
+
+
+// ===================================================================
+// 第一部分：词法终结符（Lexical Terminals）
+// ===================================================================
+// 这些规则定义了"单词"(Token)的构成规则。
+// 正则表达式用于描述字符模式。
+
+// ---- 时间字面量 ----
+// 格式: 数字 + 时间单位（允许数字和单位间有空格）
+// 示例: 100us, 1ms, 500ns, 2s
+// .2 表示优先级为 2（高于普通数字的 1），确保优先匹配为时间字面量
+TIME_LIT.2: /\d+\s*(ns|us|ms|s)/
+
+// ---- 大小字面量 ----
+// 格式: 数字 + 大小单位
+// 示例: 256KB, 1MB, 4096B
+SIZE_LIT.2: /\d+\s*(B|KB|MB)/
+
+// ---- 数值和布尔字面量 ----
+// INT.1: 优先级为 1 的正整数（低于 TIME_LIT/SIZE_LIT 的优先级 2）
+INT.1: /[0-9]+/
+// BOOL.2: 布尔值 true 或 false
+BOOL.2: "true" | "false"
+
+// ---- 字符串字面量 ----
+// 双引号包围，支持转义字符 \n \t \\ \" 等
+// 正则: 双引号之间的内容，可以是普通字符或转义序列
+STRING: /"(?:[^"\\]|\\.)*"/
+
+// ---- 聚合变量标识符 ----
+// 以 @ 开头，后跟字母/下划线，然后是字母/数字/下划线
+// 示例: @count, @avg_latency, @latency_hist
+AGG_IDENT: /@[a-zA-Z_][a-zA-Z0-9_]*/
+
+// ---- 普通标识符 ----
+// 以字母或下划线开头，后跟字母/数字/下划线
+// 可以是关键字（如 tool）、上下文变量（如 pid）、或用户变量
+IDENT: /[a-zA-Z_][a-zA-Z0-9_]*/
+
+// ---- 忽略的字符 ----
+// 空白字符（空格、制表符、换页符、回车、换行）→ 忽略
+%ignore /[ \t\f\r\n]+/
+// 单行注释 // ... → 忽略
+%ignore /\/\/[^\n]*/
+// 块注释 /* ... */ → 忽略（支持嵌套的 * 不匹配 */ 的情况）
+%ignore /\/\*(?:[^*]|\*+[^\/])*\*+\//
+
+
+// ===================================================================
+// 第二部分：程序顶层结构（Program Structure）
+// ===================================================================
+
+// 解析起始规则：从 program 开始解析整个文件
+start: program
+
+// ---- 程序 = 工具声明 + 0个或多个顶层语句 ----
+// 一个 Emon 程序由一个 tool 声明开头，后跟若干 observe/every/begin/end 块
+program: tool_decl top_stmt*
+
+// ---- 工具声明 ----
+// 格式: tool 工具名 { 选项声明* }
+// 示例:
+//   tool syscall_counter {
+//       option top_n = 20;
+//       option interval = 1s;
+//   }
+tool_decl: "tool" IDENT "{" option_decl* "}"
+
+// ---- 选项声明 ----
+// 格式: option 选项名 = 常量值;
+// 选项值必须是编译时可确定的常量
+option_decl: "option" IDENT "=" const_expr ";"
+
+// ---- 常量表达式（option 的值） ----
+// 只能是字面量，不能是变量或运算
+?const_expr: INT          -> const_int     // 整型常量: 42
+           | STRING       -> const_string  // 字符串常量: "hello"
+           | BOOL         -> const_bool    // 布尔常量: true/false
+           | time_lit     -> const_time    // 时间常量: 1s
+           | size_lit     -> const_size    // 大小常量: 1MB
+
+time_lit: TIME_LIT   // 时间字面量的别名
+size_lit: SIZE_LIT   // 大小字面量的别名
+
+// ---- 顶层语句 ----
+// 可以是 observe/every/begin/end 之一
+top_stmt: observe_stmt
+        | every_stmt
+        | begin_stmt
+        | end_stmt
+
+
+// ===================================================================
+// 第三部分：Observe（观测）语句
+// ===================================================================
+// observe 是 Emon DSL 最核心的语句，定义一条监控规则。
+
+// ---- Observe 语句 ----
+// 格式: observe 观测目标 [where子句] [measure子句] [when子句] 代码块
+// 方括号 [] 表示可选
+observe_stmt: "observe" observe_target [where_clause] [measure_clause] [when_clause] block
+
+// ---- 观测目标（7种类型） ----
+// 表示要把 eBPF 探针挂载到哪里
+observe_target: syscall_target     // 系统调用
+              | kernel_target      // 内核函数（kprobe）
+              | tracepoint_target  // 内核跟踪点
+              | uprobe_target      // 用户态函数
+              | sched_target       // 调度器事件
+              | file_target        // 文件系统操作
+              | net_target         // 网络操作
+
+// 系统调用目标: syscall("read", "write", "openat")
+syscall_target:    "syscall"    "(" string_list ")"
+// 内核函数目标: kernel("tcp_v4_connect")
+kernel_target:     "kernel"     "(" string_list ")"
+// 跟踪点目标: tracepoint("sched:sched_switch")
+tracepoint_target: "tracepoint" "(" string_list ")"
+// 调度器目标: sched("sched_switch")
+sched_target:      "sched"      "(" string_list ")"
+// 文件系统目标: file("vfs_read", "vfs_write")
+file_target:       "file"       "(" string_list ")"
+// 网络目标: net("tcp_sendmsg")
+net_target:        "net"        "(" string_list ")"
+
+// 用户态探针（特殊: 需要额外指定二进制文件路径）
+// 格式: uprobe("二进制路径", "函数名1", "函数名2")
+uprobe_target: "uprobe" "(" STRING "," string_list ")"
+
+// ---- 字符串列表 ----
+// 格式: "字符串1", "字符串2", ...
+string_list: STRING ("," STRING)*
+
+// ---- Where 子句（前置过滤） ----
+// 在测量之前过滤原始事件
+// 示例: where pid > 0          → 只处理非内核进程的事件
+//       where comm == "bash"   → 只处理 bash 进程的事件
+where_clause: "where" expr
+
+// ---- Measure 子句（测量声明） ----
+// 声明要测量的指标类型，以逗号分隔
+// 示例: measure latency           → 只测量延迟
+//       measure latency, retval   → 测量延迟和返回值
+measure_clause: "measure" measure_item ("," measure_item)*
+
+// ---- 测量项 ----
+// 五种可测量的指标
+measure_item: MEASURE_KW
+MEASURE_KW: "latency" | "count" | "size" | "retval" | "stack"
+// latency: 函数执行耗时
+// count:   事件发生次数
+// size:    数据大小
+// retval:  函数返回值
+// stack:   内核调用栈
+
+// ---- When 子句（后置过滤） ----
+// 在测量之后过滤事件，可以使用测量结果作为条件
+// 示例: when latency > 1ms     → 只保留延迟超过 1 毫秒的事件
+//       when retval < 0        → 只保留返回值为负的事件
+when_clause: "when" expr
+
+
+// ===================================================================
+// 第四部分：代码块和动作语句（Action Statements）
+// ===================================================================
+
+// ---- 代码块 ----
+// 花括号包围的一系列动作语句
+block: "{" action_stmt* "}"
+
+// ---- 动作语句 ----
+// 代码块中可以使用的五种语句
+action_stmt: aggregation_stmt   // 聚合语句: @count[...] = count();
+           | emit_stmt          // 发射事件: emit { ... };
+           | print_stmt         // 打印语句: print(...);
+           | let_stmt           // 变量声明: let x = ...;
+           | if_stmt            // 条件判断: if (...) { ... }
+
+// ---- 4.1 聚合语句（核心！） ----
+// 格式: @聚合名 [key列表] = 聚合函数(参数);
+//
+// 聚合语句将数据按 key 分组，在 eBPF map 中累积统计。
+// 这是 Emon DSL 最重要的语句。
+//
+// 示例:
+//   @count[comm, pid, syscall]        = count();          → 按(进程名,pid,系统调用)分组计数
+//   @avg_latency[comm, pid, syscall]  = avg(latency);     → 按以上 key 计算平均延迟
+//   @latency_hist[comm]               = hist(latency);    → 按进程名分组的延迟直方图
+//   @total_bytes[comm]                = sum(size);        → 按进程名累加字节数
+aggregation_stmt: AGG_IDENT "[" key_list "]" "=" agg_func "(" [expr] ")" ";"
+
+// Key 列表: 逗号分隔的表达式列表
+// 例如: comm, pid, syscall
+key_list: expr ("," expr)*
+
+// 聚合函数: 7 种
+agg_func: AGG_FUNC_KW
+AGG_FUNC_KW: "count" | "sum" | "avg" | "min" | "max" | "hist" | "lhist"
+// count: 计数
+// sum:   求和
+// avg:   平均值
+// min:   最小值
+// max:   最大值
+// hist:  对数直方图（桶宽按 2 的幂次增长）
+// lhist: 线性直方图（等宽桶）
+
+// ---- 4.2 Emit 语句（事件输出） ----
+// 将每个事件的数据通过 ring buffer 发送到用户态
+// 格式: emit { 字段1 = 值1; 字段2 = 值2; ... };
+//
+// 示例:
+//   emit {
+//       time    = nsecs;
+//       pid     = pid;
+//       latency = latency;
+//   };
+emit_stmt: "emit" "{" (field_assign ";")+ "}" ";"
+
+// 字段赋值: 字段名 = 表达式
+field_assign: IDENT "=" expr
+
+// ---- 4.3 Print 语句 ----
+// 在用户态打印信息（用于 every/begin/end 块）
+// 示例:
+//   print("==== summary ====");
+//   print(top(@count, 10));
+//   print(@avg_latency);
+print_stmt: "print" "(" expr ")" ";"
+
+// ---- 4.4 Let 语句（变量声明） ----
+// 声明一个局部变量并赋值
+// 示例:
+//   let threshold = 1000000;
+//   let is_slow = latency > threshold;
+let_stmt: "let" IDENT "=" expr ";"
+
+// ---- 4.5 If 语句（条件分支） ----
+// 支持可选的 else 分支
+// 示例:
+//   if (latency > 1000000) {
+//       @slow[comm] = count();
+//   } else {
+//       @fast[comm] = count();
+//   }
+if_stmt: "if" "(" expr ")" block ["else" block]
+
+
+// ===================================================================
+// 第五部分：生命周期语句（Lifecycle Statements）
+// ===================================================================
+
+// ---- Every 语句（周期性任务） ----
+// 每隔一段时间在用户态执行
+// 示例:
+//   every 1s { print(@count); }              → 每秒打印一次
+//   every interval { print(@avg_latency); }   → 按 option 指定的间隔执行
+every_stmt: "every" expr block
+
+// ---- Begin 语句（启动初始化） ----
+// 工具启动时执行一次
+// 示例:
+//   begin { print("监控已启动"); }
+begin_stmt: "begin" block
+
+// ---- End 语句（退出清理） ----
+// 工具退出时执行一次（收到 SIGINT 信号时）
+// 示例:
+//   end { print("最终报告:"); print(@count); }
+end_stmt: "end" block
+
+
+// ===================================================================
+// 第六部分：表达式系统（Expression System）
+// ===================================================================
+// 表达式是能"计算出值"的代码片段。
+// 表达式按优先级从低到高排列（Lark 中先定义的规则优先级更低）。
+//
+// 优先级链（从低到高）:
+//   逻辑或 (||) → 逻辑与 (&&) → 相等 (== !=)
+//   → 比较 (< <= > >=) → 加减 (+ -)
+//   → 乘除取模 (* / %) → 一元运算 (! -)
+//   → 基本表达式
+
+// ---- expr: 逻辑或（最低优先级） ----
+// a || b: a 或 b 为真
+?expr: or_expr
+
+// ---- or_expr: 逻辑或 ----
+?or_expr: and_expr ("||" and_expr)*
+
+// ---- and_expr: 逻辑与 ----
+?and_expr: eq_expr ("&&" eq_expr)*
+
+// ---- eq_expr: 相等性比较 ----
+// a == b: 等于; a != b: 不等于
+?eq_expr: rel_expr (("==" | "!=") rel_expr)*
+
+// ---- rel_expr: 大小比较 ----
+// a < b, a <= b, a > b, a >= b
+?rel_expr: add_expr (("<" | "<=" | ">" | ">=") add_expr)*
+
+// ---- add_expr: 加减运算 ----
+// a + b, a - b
+?add_expr: mul_expr (("+" | "-") mul_expr)*
+
+// ---- mul_expr: 乘除取模运算 ----
+// a * b, a / b, a % b
+?mul_expr: unary_expr (("*" | "/" | "%") unary_expr)*
+
+// ---- unary_expr: 一元运算（最高优先级） ----
+// !flag: 逻辑非; -x: 取负
+?unary_expr: ("!" | "-") unary_expr -> unary_op   // 一元运算符
+           | primary                                // 或基本表达式
+
+// ---- 基本表达式（原子表达式） ----
+// 不能再分解的最小表达式单元
+?primary: AGG_IDENT            -> agg_ref      // 聚合引用: @count
+        | func_call                            // 函数调用: top(@count, 10)
+        | INT                  -> int_lit      // 整数字面量: 42
+        | STRING               -> string_lit   // 字符串字面量: "hello"
+        | BOOL                 -> bool_lit     // 布尔字面量: true, false
+        | TIME_LIT             -> time_lit     // 时间字面量: 100us
+        | SIZE_LIT             -> size_lit     // 大小字面量: 256KB
+        | IDENT                -> var_ref      // 变量引用: pid, comm, my_var
+        | "(" expr ")"                         // 括号表达式（提升优先级）
+
+// ---- 函数调用 ----
+// 格式: 函数名(参数列表)
+// 示例: top(@count, 10), count()
+// 参数列表可以为空
+func_call: IDENT "(" [arg_list] ")"
+
+// ---- 参数列表 ----
+// 逗号分隔的表达式列表
+arg_list: expr ("," expr)*
+
+
+// ===================================================================
+// 附录：内置上下文变量（通过 IDENT 规则引用，语义分析阶段解析）
+// ===================================================================
+// 以下变量名可以在 Emon 代码中直接使用，它们由 eBPF 运行时自动提供:
+//
+//   pid       - 当前进程 ID
+//   tid       - 当前线程 ID
+//   uid       - 当前用户 ID
+//   gid       - 当前组 ID
+//   comm      - 当前进程名（最多 16 字符）
+//   cpu       - 当前 CPU 编号
+//   nsecs     - 当前纳秒时间戳
+//   syscall   - 系统调用名（仅在 observe syscall 中可用）
+//   func      - 函数名（仅在 observe kernel/uprobe 中可用）
+//   retval    - 函数返回值（需要 measure retval）
+//   latency   - 函数延迟（需要 measure latency）
+//   size      - 数据大小（需要 measure size）
+//   stack     - 调用栈（需要 measure stack）
+//   arg0-arg5 - 函数参数 0~5（仅在 kernel/uprobe/file/net 中可用）
+//
+// 这些变量在语义分析阶段（semantic.py）被检查可用性。
+// 语法层面它们只是普通的 IDENT。
+// ===================================================================

@@ -1,0 +1,45 @@
+// ===================================================================
+// syscall_count.emon —— 系统调用计数示例（最简示例）
+// ===================================================================
+//
+// 【这个示例做什么？】
+// 监控 5 个系统调用（read, write, openat, close, mmap），
+// 按进程 ID、进程名、系统调用名分组，统计每个系统调用被调用了多少次。
+// 这是学习 Emon DSL 的入门示例，只用了最基本的 @count 聚合。
+//
+// 【运行效果】
+// 程序运行后，会周期性输出类似这样的结果：
+//   @count:
+//     [1] key=... => 1523   (pid=1234, comm=bash, syscall=read)
+//     [2] key=... => 892    (pid=1234, comm=bash, syscall=write)
+//     ...
+// ===================================================================
+
+// ---- 工具声明 ----
+// tool 关键字声明一个监控工具，后面跟工具名称
+// 花括号 {} 内可以声明配置选项（option）
+tool syscall_counter {
+    // option: 声明一个配置选项（可在运行时通过命令行修改）
+    // top_n = 20: 每次只显示前 20 条统计结果
+    option top_n = 20;
+}
+
+// ---- 观察规则 ----
+// observe: 声明一条监控规则
+// syscall("read", "write", "openat", "close", "mmap"): 监控这 5 个系统调用
+// where pid > 0: 过滤条件——只统计用户态进程（pid=0 是内核空闲线程），排除内核线程
+// { ... }: 代码块，定义在这些系统调用触发时要执行的动作
+observe syscall("read", "write", "openat", "close", "mmap")
+where pid > 0
+{
+    // @count[pid, comm, syscall] = count();
+    // 这是 Emon DSL 最核心的聚合语句，拆解如下：
+    //   @count     → 聚合变量名（以 @ 开头），结果存储在名为 "count" 的 BPF map 中
+    //   [pid, comm, syscall] → 分组的 key（按什么分组统计）
+    //                         pid: 进程ID, comm: 进程名, syscall: 系统调用名
+    //   = count(); → 聚合函数：count() 表示每触发一次就计数+1
+    //
+    // 含义：每当 read/write/openat/close/mmap 被调用，
+    //       按 (进程ID, 进程名, 系统调用名) 分组，将该分组的计数+1
+    @count[pid, comm, syscall] = count();
+}

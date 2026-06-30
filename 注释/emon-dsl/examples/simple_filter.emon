@@ -1,0 +1,52 @@
+// ===================================================================
+// simple_filter.emon —— 条件过滤示例（let/if/when 用法）
+// ===================================================================
+//
+// 【这个示例做什么？】
+// 监控 read/write 系统调用的延迟，根据延迟大小将事件分类：
+//   - 延迟 > 10ms（一千万纳秒）→ 归入 "very_slow" 类别
+//   - 延迟在 1ms~10ms 之间       → 归入 "slow" 类别
+// 延迟 <= 1ms 的事件被 when 子句过滤掉，不统计。
+//
+// 【演示的语法特性】
+//   - option 声明配置选项（slow_threshold）
+//   - measure latency 声明测量延迟
+//   - when 后置过滤条件
+//   - let 局部变量声明
+//   - if/else 条件分支
+//   - emit 事件输出
+// ===================================================================
+
+tool simple_filter {
+    // 定义"慢"的阈值：1ms（毫秒）
+    // 用户可以在运行时修改这个值来调整过滤标准
+    option slow_threshold = 1ms;
+}
+
+// 监控 read 和 write 两个系统调用
+observe syscall("read", "write")
+measure latency                          // 声明要测量延迟（使 latency 变量可用）
+when latency > slow_threshold            // 后置过滤：只保留延迟超过阈值的"慢"事件
+{
+    // let 声明一个局部布尔变量
+    // 10,000,000 纳秒 = 10 毫秒
+    let is_very_slow = latency > 10000000;
+
+    // if/else: 根据延迟大小分类统计
+    if (is_very_slow) {
+        // 延迟 > 10ms → 归入 "very_slow"
+        @very_slow[comm, pid] = count();
+    } else {
+        // 延迟在 1ms~10ms 之间 → 归入 "slow"
+        @slow[comm, pid] = count();
+    }
+
+    // emit: 将每个慢事件的详细信息发送到用户态
+    // 用于实时查看哪些操作比较慢
+    emit {
+        time    = nsecs;   // 当前时间戳
+        comm    = comm;    // 进程名
+        pid     = pid;     // 进程 ID
+        latency = latency; // 延迟值
+    };
+}

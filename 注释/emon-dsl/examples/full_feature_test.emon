@@ -1,0 +1,182 @@
+// ===================================================================
+// full_feature_test.emon —— Emon DSL 全功能语法测试
+// ===================================================================
+//
+// 【这个文件的作用】
+// 这是 Emon DSL 的"语法大全"测试文件，覆盖了语言规范中定义的
+// 所有词法和语法特性。用于验证编译器的完整性和正确性。
+//
+// 【覆盖的特性清单】
+//   ✓ 7 种 option 类型: int, time, size, bool, string
+//   ✓ 7 种观测目标: syscall, kernel, tracepoint, uprobe, sched, file, net
+//   ✓ 5 种测量指标: latency, count, size, retval, stack
+//   ✓ 7 种聚合函数: count, sum, avg, min, max, hist, lhist
+//   ✓ where + when 双重过滤
+//   ✓ let 变量 + if/else 分支
+//   ✓ 一元运算符: ! (逻辑非), - (取负)
+//   ✓ emit 事件输出
+//   ✓ 表达式系统: 算术、比较、逻辑运算
+// ===================================================================
+
+tool full_feature_test {
+    option target_pid   = 0;                   // int 类型 option
+    option threshold    = 1ms;                 // time 类型 option
+    option interval     = 2s;                  // time 类型 option
+    option top_n        = 10;                  // int 类型 option
+    option max_size     = 1MB;                 // size 类型 option
+    option debug        = true;                // bool 类型 option
+    option log_path     = "/var/log/emon.log"; // string 类型 option
+}
+
+// ================================================================
+// 测试 1: 系统调用监控 — 最全面的功能测试
+// ================================================================
+observe syscall("read", "write", "openat", "close")
+where target_pid == 0 || pid == target_pid       // where + option 引用 + 逻辑或
+measure latency, retval                           // 测量延迟和返回值
+when latency > threshold && retval >= 0 && debug == true  // 多重逻辑与过滤
+{
+    // ---- 7 种聚合函数全覆盖 ----
+    @count[comm, pid, syscall]        = count();         // 计数
+    @avg_lat[comm, pid, syscall]      = avg(latency);     // 平均值
+    @hist_lat[comm, pid, syscall]     = hist(latency);    // 对数直方图
+    @sum_lat[comm]                    = sum(latency);     // 求和
+    @min_lat[comm]                    = min(latency);     // 最小值
+    @max_lat[comm]                    = max(latency);     // 最大值
+    @lhist_lat[comm]                  = lhist(latency);   // 线性直方图
+
+    // ---- let 变量声明 ----
+    let slow = 1000000;               // 1ms = 1,000,000ns
+    let is_slow = latency > slow;    // 比较运算
+
+    // ---- if/else 条件分支 ----
+    if (is_slow) {
+        @slow_count[comm, syscall] = count();
+    } else {
+        @fast_count[comm, syscall] = count();
+    }
+
+    // ---- 一元运算符 ----
+    // !is_slow: 逻辑非；-retval: 取负
+    if (!is_slow && -retval == -1) {
+        @error_count[comm] = count();
+    }
+
+    // ---- emit 多字段事件输出 ----
+    emit {
+        time    = nsecs;
+        comm    = comm;
+        pid     = pid;
+        tid     = tid;
+        uid     = uid;
+        cpu     = cpu;
+        syscall = syscall;
+        latency = latency;
+        retval  = retval;
+    };
+}
+
+// ================================================================
+// 测试 2: 内核函数监控（kprobe）
+// ================================================================
+observe kernel("tcp_v4_connect", "tcp_v6_connect")
+measure latency
+{
+    @k_count[func]          = count();       // func 变量仅在 kernel hook 中可用
+    @k_avg[func]            = avg(latency);
+    @k_hist[func]           = hist(latency);
+
+    emit {
+        time    = nsecs;
+        func    = func;     // 内核函数名
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+// ================================================================
+// 测试 3: 跟踪点监控（tracepoint）
+// ================================================================
+observe tracepoint("sched:sched_process_exec", "sched:sched_process_exit")
+measure count
+{
+    // 统计进程创建和退出的次数
+    @exec_count[comm, pid]  = count();
+
+    emit {
+        time = nsecs;
+        comm = comm;
+        pid  = pid;
+    };
+}
+
+// ================================================================
+// 测试 4: 用户态函数监控（uprobe）
+// ================================================================
+observe uprobe("/bin/bash", "readline")
+measure latency, retval
+{
+    @bash_count[pid, comm]    = count();
+    @bash_avg[pid, comm]      = avg(latency);
+
+    emit {
+        time    = nsecs;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}
+
+// ================================================================
+// 测试 5: 调度器事件监控
+// ================================================================
+observe sched("sched_switch")
+measure count
+{
+    // 按 CPU 统计上下文切换次数
+    @switch_count[cpu] = count();
+
+    emit {
+        time = nsecs;
+        cpu  = cpu;
+        comm = comm;
+    };
+}
+
+// ================================================================
+// 测试 6: 文件系统事件监控
+// ================================================================
+observe file("open", "close", "read", "write")
+measure latency, size
+when size > max_size    // 使用 size 类型 option 作为过滤条件
+{
+    @file_count[comm, pid]  = count();
+    @file_size[comm, pid]   = sum(size);     // 累加读写大小
+    @file_avg[comm, pid]    = avg(latency);
+
+    emit {
+        time    = nsecs;
+        comm    = comm;
+        pid     = pid;
+        size    = size;
+        latency = latency;
+    };
+}
+
+// ================================================================
+// 测试 7: 网络事件监控
+// ================================================================
+observe net("tcp", "udp")
+measure count, size
+{
+    @net_count[comm]    = count();
+    @net_size[comm]     = sum(size);
+
+    emit {
+        time = nsecs;
+        comm = comm;
+        pid  = pid;
+        size = size;
+    };
+}

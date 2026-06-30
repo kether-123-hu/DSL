@@ -1,0 +1,43 @@
+// ===================================================================
+// file_monitor.emon —— 文件系统事件监控示例
+// ===================================================================
+//
+// 【这个示例做什么？】
+// 监控虚拟文件系统（VFS）层的读写操作，测量延迟。
+// 每隔 interval 秒输出统计报告。
+//
+// 【observe file 的含义】
+// file("kernel_func1", "kernel_func2") 将 kprobe 挂载到
+// 文件系统相关的内核函数。示例中的函数:
+//   vfs_read:  虚拟文件系统读取
+//   vfs_write: 虚拟文件系统写入
+//   vfs_open:  虚拟文件系统打开
+// ===================================================================
+
+tool file_monitor {
+    option interval = 3s;  // 每 3 秒输出一次
+}
+
+observe file("vfs_read", "vfs_write", "vfs_open")
+measure latency
+{
+    // 按(函数名, 进程名)分组统计
+    @f_count[func, comm]   = count();        // 调用次数
+    @f_avg[func, comm]     = avg(latency);    // 平均延迟
+
+    // 输出每个文件操作事件
+    emit {
+        time    = nsecs;
+        func    = func;
+        comm    = comm;
+        pid     = pid;
+        latency = latency;
+    };
+}
+
+// 周期性输出统计
+every interval {
+    print("==== 文件操作统计 ====");
+    print(@f_count);
+    print(@f_avg);
+}

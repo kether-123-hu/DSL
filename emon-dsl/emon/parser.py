@@ -295,6 +295,21 @@ class EmonTransformer(Transformer):
     def unary_op(self, items):
         return UnaryOpExpr(op=_UNARYOP_MAP[_token_val(items[0])], operand=items[1])
 
+    def primary(self, items):
+        """Handle parenthesized expression: '(' expr ')' → inner expr.
+
+        The Lark grammar defines ?primary with several aliased alternatives
+        (e.g. IDENT -> var_ref, INT -> int_lit), which Lark routes to the
+        corresponding transformer methods directly.  The "(" expr ")"
+        alternative has no alias, so Lark creates a 'primary' tree node
+        that we must handle here by returning the inner expression.
+        """
+        # "(" expr ")" → items = [Token('('), expr, Token(')')]
+        if len(items) == 3:
+            return items[1]
+        # Fallback (should not normally be reached)
+        return items[0] if items else None
+
     def or_expr(self, items):
         return _build_binary(items)
 

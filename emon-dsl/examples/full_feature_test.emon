@@ -149,6 +149,54 @@ measure count, size
     };
 }
 
+// Test 7b: measure stack + stack/gid variables + != operator
+observe syscall("clone", "fork")
+where pid != 0 && gid != 0
+measure latency, stack
+when latency != 0
+{
+    @stack_lat[comm, pid]    = avg(latency);
+    @stack_hist[comm, gid]   = hist(latency);
+    @gid_count[gid, comm]    = count();
+
+    if (gid != uid) {
+        @cross_group[comm] = count();
+    }
+
+    emit {
+        time    = nsecs;
+        gid     = gid;
+        stack   = stack;
+        latency = latency;
+    };
+}
+
+// Test 7c: arithmetic operators (+, -, *, /, %) in expressions
+observe syscall("read", "write")
+where (pid + tid) / 2 > 500
+measure latency, retval
+when latency > 0
+{
+    // let with arithmetic expressions (all using u64 latency to avoid BPF signed div issue)
+    let doubled = latency * 2;
+    let halved = latency / 2;
+    let remainder = latency % 100;
+    let adjusted = latency - remainder + 500;
+    let combined = (doubled + halved) / (remainder + 1);
+
+    @arith_avg[comm, pid]  = avg(doubled);
+    @arith_sum[comm, pid]  = sum(adjusted);
+
+    emit {
+        time      = nsecs;
+        doubled   = doubled;
+        halved    = halved;
+        remainder = remainder;
+        adjusted  = adjusted;
+        combined  = combined;
+    };
+}
+
 // Test 8: begin / end lifecycle blocks
 begin {
     print("=== Emon DSL Full Feature Test ===");
@@ -178,4 +226,13 @@ every interval {
     print(@bash_avg);
     print(@file_size);
     print(@net_size);
+}
+
+// Test 9b: every with literal time value (not option reference)
+every 5s {
+    print("=== Literal Time Every Test ===");
+    print(@stack_lat);
+    print(@gid_count);
+    print(@arith_avg);
+    print(@cross_group);
 }

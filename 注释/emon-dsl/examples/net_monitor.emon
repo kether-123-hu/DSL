@@ -1,0 +1,37 @@
+// ===================================================================
+// net_monitor.emon —— 网络事件监控示例
+// ===================================================================
+//
+// 【这个示例做什么？】
+// 监控 TCP/UDP 协议栈中的发送/接收函数，测量它们的延迟。
+// 用于分析网络 I/O 性能。
+//
+// 【observe net 的含义】
+// net("func1", "func2") 将 kprobe 挂载到网络相关的内核函数上。
+// 示例中的函数:
+//   tcp_sendmsg:  TCP 发送消息
+//   tcp_recvmsg:  TCP 接收消息
+//   udp_sendmsg:  UDP 发送消息
+// ===================================================================
+
+tool net_monitor {
+    option top_n = 5;  // 只显示前 5 条
+}
+
+// 监控网络协议栈函数
+observe net("tcp_sendmsg", "tcp_recvmsg", "udp_sendmsg")
+measure latency
+{
+    // 按(函数名, 进程ID)分组统计
+    @net_count[func, pid] = count();       // 各函数的调用次数
+    @net_avg[func]        = avg(latency);  // 各函数的平均延迟
+
+    // 输出事件详情
+    emit {
+        time    = nsecs;
+        func    = func;
+        pid     = pid;
+        comm    = comm;
+        latency = latency;
+    };
+}

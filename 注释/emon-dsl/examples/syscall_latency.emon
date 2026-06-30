@@ -1,0 +1,71 @@
+// ===================================================================
+// syscall_latency.emon —— 系统调用延迟监控（功能最全面的示例）
+// ===================================================================
+//
+// 【这个示例做什么？】
+// 完整演示 Emon DSL 的几乎所有核心功能：
+//   1. 多种 option 声明（数值、时间、布尔）
+//   2. where + when 双重过滤
+//   3. 多种聚合函数（count, avg, hist）
+//   4. emit 多字段事件输出
+//   5. every 周期性报告
+//   6. top() 函数和聚合变量引用
+//
+// 【使用场景】
+// 分析哪些进程的哪些系统调用最慢，
+// 生成延迟分布直方图，帮助定位性能瓶颈。
+// ===================================================================
+
+tool syscall_latency_monitor {
+    option target_pid   = 0;       // 目标进程 ID（0=所有进程）
+    option min_latency  = 100us;   // 最小延迟过滤阈值（100 微秒）
+    option interval     = 1s;      // 报告间隔（1 秒）
+    option top          = 10;      // top-N 数量
+}
+
+observe syscall("read", "write", "openat")
+// where: 前置过滤（在函数入口处判断）
+// target_pid == 0 || pid == target_pid
+//   → 如果 target_pid=0 则不过滤，否则只关注特定进程
+where target_pid == 0 || pid == target_pid
+// measure: 声明要测量延迟和返回值
+measure latency, retval
+// when: 后置过滤（在函数出口处判断，可以使用测量结果）
+// 只保留延迟超过 min_latency 的事件
+when latency > min_latency
+{
+    // 三个聚合变量，按 (进程名, 进程ID, 系统调用名) 分组:
+
+    // @count: 统计各系统调用的"慢"事件次数
+    @count[comm, pid, syscall] = count();
+
+    // @avg_latency: 计算各系统调用的平均延迟
+    @avg_latency[comm, pid, syscall] = avg(latency);
+
+    // @latency_hist: 生成延迟分布直方图（对数分桶）
+    // 可以直观地看到延迟的分布情况
+    @latency_hist[comm, pid, syscall] = hist(latency);
+
+    // emit: 输出每个"慢"事件的详细信息
+    // 包含进程信息、CPU 信息、系统调用名、延迟、返回值
+    emit {
+        time    = nsecs;    // 纳秒时间戳
+        comm    = comm;     // 进程名
+        pid     = pid;      // 进程 ID
+        tid     = tid;      // 线程 ID
+        uid     = uid;      // 用户 ID
+        cpu     = cpu;      // CPU 编号
+        syscall = syscall;  // 系统调用名
+        latency = latency;  // 延迟值
+        retval  = retval;   // 返回值
+    };
+}
+
+// 每 interval 秒输出一次统计报告
+every interval {
+    print("==== 系统调用延迟统计 ====");
+    // top(@count, top): 取调用次数最多的前 top 个
+    print(top(@count, top));
+    print(@avg_latency);    // 打印平均延迟
+    print(@latency_hist);   // 打印延迟直方图
+}
