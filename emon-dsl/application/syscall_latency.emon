@@ -1,0 +1,45 @@
+/**
+ * Application测试：系统调用延迟监控
+ * 
+ * 功能说明：
+ * 1. 监控 read/write/openat 三个系统调用
+ * 2. 过滤 PID > 0 的进程（排除内核进程）
+ * 3. 按进程名和PID聚合计数
+ * 4. 输出延迟超过100us的事件
+ * 
+ * 用于对比原生eBPF C代码的开发效率
+ */
+
+tool syscall_latency_monitor {
+    option min_latency = 100us;   // 最小延迟阈值：100微秒
+}
+
+observe syscall("read", "write", "openat")
+where pid > 0                    // 过滤：只监控用户进程
+measure latency                  // 测量：系统调用延迟
+when latency > min_latency       // 条件：延迟超过阈值
+{
+    // 按进程名和PID聚合统计
+    @count[comm, pid] = count();
+    
+    // 输出延迟事件到用户态
+    emit {
+        time = nsecs;
+        syscall = syscall;
+        pid = pid;
+        comm = comm;
+        latency = latency;
+    };
+}
+
+// 每秒打印聚合统计
+every 1s {
+    print("=== 系统调用延迟统计 ===");
+    print(@count);
+}
+
+// 结束时打印最终报告
+end {
+    print("=== 最终统计报告 ===");
+    print(@count);
+}

@@ -1,0 +1,14 @@
+/home/mxr/桌面/bianyi/emon-dsl/application/native/seepod-main/target/release/deps/serde-5e551ded5ffdfa7e.d: /home/mxr/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /home/mxr/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /home/mxr/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /home/mxr/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /home/mxr/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /home/mxr/桌面/bianyi/emon-dsl/application/native/seepod-main/target/release/build/serde-267e49a898ff1aae/out/private.rs
+
+/home/mxr/桌面/bianyi/emon-dsl/application/native/seepod-main/target/release/deps/libserde-5e551ded5ffdfa7e.rlib: /home/mxr/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /home/mxr/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /home/mxr/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /home/mxr/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /home/mxr/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /home/mxr/桌面/bianyi/emon-dsl/application/native/seepod-main/target/release/build/serde-267e49a898ff1aae/out/private.rs
+
+/home/mxr/桌面/bianyi/emon-dsl/application/native/seepod-main/target/release/deps/libserde-5e551ded5ffdfa7e.rmeta: /home/mxr/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /home/mxr/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /home/mxr/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /home/mxr/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /home/mxr/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /home/mxr/桌面/bianyi/emon-dsl/application/native/seepod-main/target/release/build/serde-267e49a898ff1aae/out/private.rs
+
+/home/mxr/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs:
+/home/mxr/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs:
+/home/mxr/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs:
+/home/mxr/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs:
+/home/mxr/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs:
+/home/mxr/桌面/bianyi/emon-dsl/application/native/seepod-main/target/release/build/serde-267e49a898ff1aae/out/private.rs:
+
+# env-dep:OUT_DIR=/home/mxr/桌面/bianyi/emon-dsl/application/native/seepod-main/target/release/build/serde-267e49a898ff1aae/out
